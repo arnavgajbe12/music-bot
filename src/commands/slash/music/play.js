@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
+const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
 const { checkVoice } = require('../../../utils/functions');
+const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,10 +21,11 @@ module.exports = {
     }
 
     const rawQuery = interaction.options.getString('query');
-    // If the query is a plain search term (not a URL), prefix it so Kazagumo/LavaSrc
-    // routes it through YouTube Music by default.
+    // Use the guild's stored playback source, or fall back to YouTube Music
+    const settings = getSettings(interaction.guild.id);
+    const searchPrefix = settings.playbackSource || 'ytmsearch:';
     const isUrl = /^https?:\/\//i.test(rawQuery);
-    const query = isUrl ? rawQuery : `ytmsearch:${rawQuery}`;
+    const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
     const voiceChannel = interaction.member.voice.channel;
 
     let player = client.manager.players.get(interaction.guild.id);
@@ -40,7 +43,7 @@ module.exports = {
     let result;
     try {
       result = await client.manager.search(query, { requester: interaction.user });
-    } catch (error) {
+    } catch {
       return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
     }
 
@@ -48,23 +51,35 @@ module.exports = {
       return interaction.editReply({ embeds: [buildErrorEmbed('No results found for that query.')] });
     }
 
+    const wasIdle = !player.playing && !player.paused;
+
     if (result.type === 'PLAYLIST') {
-      for (const track of result.tracks) {
-        player.queue.add(track);
+      for (const track of result.tracks) player.queue.add(track);
+      // If it wasn't already playing, the playerStart event will show the Now Playing panel.
+      // Only show "Added to Queue" if songs were added to an already-running queue.
+      if (!wasIdle) {
+        const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
+        const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
+        const msg = await interaction.editReply(payload);
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+        return;
       }
-      await interaction.editReply({
-        embeds: [buildEmbed(`✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`)],
-      });
+      await interaction.deleteReply().catch(() => {});
     } else {
       const track = result.tracks[0];
       player.queue.add(track);
-      await interaction.editReply({
-        embeds: [buildEmbed(`✅ Added **${track.title}** to the queue.`)],
-      });
+      if (!wasIdle) {
+        // Song added to an already-running queue – show "Added to Queue" Component v2
+        const queueSize = player.queue.size;
+        const payload = buildAddedToQueueV2(track, queueSize);
+        await interaction.editReply(payload);
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+        return;
+      }
+      // Starting fresh – the playerStart event will send the Now Playing panel
+      await interaction.deleteReply().catch(() => {});
     }
 
-    if (!player.playing && !player.paused) {
-      await player.play();
-    }
+    if (wasIdle) await player.play();
   },
 };

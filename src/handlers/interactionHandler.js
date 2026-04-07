@@ -39,7 +39,35 @@ module.exports = (client) => {
           console.error('[InteractionHandler] help_category select error:', error);
           await interaction.reply({ embeds: [buildErrorEmbed('Could not load that category.')], ephemeral: true }).catch(() => {});
         }
+        return;
       }
+
+      if (interaction.customId === 'source_metadata' || interaction.customId === 'source_playback') {
+        try {
+          const { updateSettings, getSettings } = require('../utils/setupManager');
+          const { buildSourcePanel } = require('../commands/slash/general/source');
+          const guildId = interaction.guild.id;
+          const selected = interaction.values[0];
+
+          if (interaction.customId === 'source_metadata') {
+            updateSettings(guildId, { metadataSource: selected });
+          } else {
+            updateSettings(guildId, { playbackSource: selected });
+          }
+
+          const settings = getSettings(guildId);
+          const panel = buildSourcePanel(
+            settings.metadataSource || 'youtube',
+            settings.playbackSource || 'ytmsearch:',
+          );
+          await interaction.update(panel);
+        } catch (error) {
+          console.error('[InteractionHandler] source select error:', error);
+          await interaction.reply({ embeds: [buildErrorEmbed('Could not update source setting.')], ephemeral: true }).catch(() => {});
+        }
+        return;
+      }
+
       return;
     }
 
