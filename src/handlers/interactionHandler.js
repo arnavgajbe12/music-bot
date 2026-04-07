@@ -1,8 +1,33 @@
 const { EmbedBuilder } = require('discord.js');
 const { buildErrorEmbed, resolvePlatformEmoji, resolveSourceDisplayName, formatDuration } = require('../utils/embeds');
-const { buildPlayerButtonsV2, buildQueueV2, buildPlayNextConfirmV2, buildNowPlayingV2, buildSetupNowPlayingV2, buildSetupButtonsV2, extractDominantColor } = require('../utils/componentBuilder');
+const {
+  buildPlayerButtonsV2,
+  buildQueueV2,
+  buildQueueStandaloneV2,
+  buildPlayNextConfirmV2,
+  buildNowPlayingV2,
+  buildSetupNowPlayingV2,
+  buildSetupQueueViewV2,
+  buildSetupButtonsV2,
+  extractDominantColor,
+} = require('../utils/componentBuilder');
 const { getSettings, getSetup } = require('../utils/setupManager');
 const config = require('../../config');
+
+/**
+ * Get the cached accent color for a player, or extract it from the thumbnail URL.
+ * Caches the result in player.data for subsequent calls.
+ * @param {object} player - KazagumoPlayer
+ * @param {string|null} artUrl - Thumbnail URL
+ * @returns {Promise<number>} Integer color value
+ */
+async function resolveAccentColor(player, artUrl) {
+  const cached = player.data.get('accentColor');
+  if (cached != null) return cached;
+  const color = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+  player.data.set('accentColor', color);
+  return color;
+}
 
 /**
  * @param {import('discord.js').Client} client
@@ -140,7 +165,7 @@ module.exports = (client) => {
               let payload;
               if (setupInfo && interaction.message?.id === setupInfo.messageId) {
                 const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
-                const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+                const accentColor = await resolveAccentColor(player, artUrl);
                 payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
               } else {
                 payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
@@ -232,7 +257,25 @@ module.exports = (client) => {
     if (interaction.isButton()) {
       const { customId, guild, member } = interaction;
 
-      // ── Queue pagination navigation ──────────────────────────────────────
+      // ── Queue delete button ──────────────────────────────────────────────
+      if (customId === 'queue_delete') {
+        await interaction.deferUpdate().catch(() => {});
+        return interaction.message.delete().catch(() => {});
+      }
+
+      // ── Standalone queue pagination ──────────────────────────────────────
+      if (customId.startsWith('queue_standalone_nav:')) {
+        const player = client.manager.players.get(guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+        const page = parseInt(customId.split(':')[1], 10);
+        const tracks = [...player.queue];
+        const payload = buildQueueStandaloneV2(player.queue.current, tracks, page);
+        return interaction.update(payload);
+      }
+
+      // ── Queue pagination navigation (more-options view queue) ──────────────────────────────────────
       if (customId.startsWith('queue_nav:')) {
         const player = client.manager.players.get(guild.id);
         if (!player || !player.queue.current) {
@@ -242,6 +285,96 @@ module.exports = (client) => {
         const tracks = [...player.queue];
         const payload = buildQueueV2(player.queue.current, tracks, page);
         return interaction.update(payload);
+      }
+
+      // ── Setup channel queue view navigation ────────────────────────────────
+      if (customId.startsWith('setup_queue_nav:')) {
+        const setupInfo = getSetup(guild.id);
+        if (!setupInfo || interaction.message.id !== setupInfo.messageId) return interaction.deferUpdate().catch(() => {});
+
+        const player = client.manager.players.get(guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        const page = parseInt(customId.split(':')[1], 10);
+        const tracks = [...player.queue];
+        const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+        const accentColor = await resolveAccentColor(player, artUrl);
+        const payload = buildSetupQueueViewV2(player.queue.current, tracks, page, accentColor, player);
+        player.data.set('setupQueuePage', page);
+        return interaction.update(payload);
+      }
+
+      // ── Setup channel Row 2 buttons ────────────────────────────────────────
+      const setupRow2Ids = ['setup_queue', 'setup_shuffle', 'setup_vol_down', 'setup_vol_up'];
+      if (setupRow2Ids.includes(customId)) {
+        const setupInfo = getSetup(guild.id);
+        if (!setupInfo || interaction.message.id !== setupInfo.messageId) {
+          return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
+        }
+
+        const player = client.manager.players.get(guild.id);
+        if (!player) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        // Require user to be in the same voice channel
+        const voiceChannel = member.voice?.channel;
+        if (!voiceChannel || voiceChannel.id !== player.voiceId) {
+          return interaction.reply({
+            embeds: [buildErrorEmbed('You must be in the same voice channel as the bot to use controls.')],
+            ephemeral: true,
+          });
+        }
+
+        if (customId === 'setup_queue') {
+          // Toggle queue view
+          const isQueueView = player.data.get('setupQueueView') === true;
+          if (!player.queue.current) return interaction.deferUpdate().catch(() => {});
+          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const accentColor = await resolveAccentColor(player, artUrl);
+          if (isQueueView) {
+            // Switch back to art view
+            player.data.set('setupQueueView', false);
+            const payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+            return interaction.update(payload);
+          } else {
+            // Switch to queue view
+            player.data.set('setupQueueView', true);
+            player.data.set('setupQueuePage', 1);
+            const tracks = [...player.queue];
+            const payload = buildSetupQueueViewV2(player.queue.current, tracks, 1, accentColor, player);
+            return interaction.update(payload);
+          }
+        }
+
+        if (customId === 'setup_shuffle') {
+          await interaction.deferUpdate();
+          const queueArr = [...player.queue];
+          for (let i = queueArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [queueArr[i], queueArr[j]] = [queueArr[j], queueArr[i]];
+          }
+          player.queue.splice(0, player.queue.length, ...queueArr);
+          return;
+        }
+
+        if (customId === 'setup_vol_down') {
+          await interaction.deferUpdate();
+          const newVol = Math.max(0, (player.volume ?? 100) - 10);
+          await player.setVolume(newVol).catch(() => {});
+          return;
+        }
+
+        if (customId === 'setup_vol_up') {
+          await interaction.deferUpdate();
+          const newVol = Math.min(200, (player.volume ?? 100) + 10);
+          await player.setVolume(newVol).catch(() => {});
+          return;
+        }
+
+        return;
       }
 
       const validIds = ['player_previous', 'player_pause', 'player_skip', 'player_stop'];
@@ -314,10 +447,17 @@ module.exports = (client) => {
 
           let payload;
           if (setupInfo && interaction.message.id === setupInfo.messageId) {
-            // Setup channel panel — use setup-specific builder
+            // Setup channel panel — respect current view mode
             const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
-            const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
-            payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+            const accentColor = await resolveAccentColor(player, artUrl);
+            const isQueueView = player.data.get('setupQueueView') === true;
+            if (isQueueView) {
+              const tracks = [...player.queue];
+              const qPage = player.data.get('setupQueuePage') || 1;
+              payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player);
+            } else {
+              payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+            }
           } else {
             payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
           }

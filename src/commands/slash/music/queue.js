@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('../../../utils/embeds');
-const { buildQueueV2 } = require('../../../utils/componentBuilder');
+const { buildQueueStandaloneV2 } = require('../../../utils/componentBuilder');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -21,7 +21,7 @@ module.exports = {
 
     const tracks = [...player.queue];
     const page = interaction.options.getInteger('page') || 1;
-    const payload = buildQueueV2(player.queue.current, tracks, page);
+    const payload = buildQueueStandaloneV2(player.queue.current, tracks, page);
 
     return interaction.editReply(payload);
   },
