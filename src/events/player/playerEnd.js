@@ -4,12 +4,8 @@ module.exports = {
    * @param {import('kazagumo').KazagumoPlayer} player
    * @param {import('kazagumo').KazagumoTrack} track
    */
-  async run(client, player, track) {
-    // Clean up the now-playing message when the track ends
-    const msg = player.data.get('nowPlayingMessage');
-    if (msg?.deletable) {
-      await msg.delete().catch(() => {});
-    }
-    player.data.delete('nowPlayingMessage');
+  async run(client, player, track) { // eslint-disable-line no-unused-vars
+    // The now-playing message is kept alive so that playerStart (next track)
+    // or playerEmpty (queue ended) can edit it.  Nothing to do here.
   },
 };

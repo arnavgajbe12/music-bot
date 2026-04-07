@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 
 /**
- * Format milliseconds into a readable duration string
+ * Format milliseconds into a readable duration string (mm:ss or h:mm:ss)
  * @param {number} ms - Duration in milliseconds
  * @returns {string}
  */
@@ -47,7 +47,28 @@ function buildErrorEmbed(description) {
 }
 
 /**
- * Build a Now Playing embed
+ * Resolve the platform emoji from a source name
+ * @param {string} sourceName
+ * @returns {string}
+ */
+function resolvePlatformEmoji(sourceName) {
+  const sourceMap = {
+    spotify: config.emojis.platforms.spotify,
+    jiosaavn: config.emojis.platforms.jiosaavn,
+    'apple music': config.emojis.platforms.applemusic,
+    applemusic: config.emojis.platforms.applemusic,
+    soundcloud: config.emojis.platforms.soundcloud,
+    'amazon music': config.emojis.platforms.amazonmusic,
+    amazonmusic: config.emojis.platforms.amazonmusic,
+    deezer: config.emojis.platforms.deezer,
+    youtube: config.emojis.platforms.youtube,
+    youtubemusic: config.emojis.platforms.youtubemusic,
+  };
+  return sourceMap[(sourceName || '').toLowerCase()] || config.emojis.music;
+}
+
+/**
+ * Build the "Now Playing" embed (stylized Component v2-style layout)
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
  * @param {string} [platformEmoji] - Emoji representing the source platform
@@ -58,21 +79,50 @@ function buildNowPlayingEmbed(track, player, platformEmoji) {
   const requester = track.requester;
   const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
   const emoji = platformEmoji || config.emojis.music;
+  const sourceName = track.sourceName
+    ? track.sourceName.charAt(0).toUpperCase() + track.sourceName.slice(1)
+    : 'Unknown';
+  const loopMode = player.loop && player.loop !== 'none'
+    ? ` ${config.emojis.loop} \`${player.loop}\``
+    : '';
 
   return new EmbedBuilder()
     .setColor(config.embeds.color)
-    .setTitle(`${emoji} Now Playing`)
-    .setDescription(`**[${track.title}](${track.uri})**`)
+    .setAuthor({ name: `${emoji} Now Playing${loopMode}` })
+    .setTitle(track.title)
+    .setURL(track.uri || null)
     .addFields(
-      { name: 'Artist', value: track.author || 'Unknown', inline: true },
-      { name: 'Duration', value: formatDuration(track.length), inline: true },
-      { name: 'Requested By', value: requesterTag, inline: true },
-      { name: 'Volume', value: `${player.volume}%`, inline: true },
-      { name: 'Queue', value: `${player.queue.size} track(s) remaining`, inline: true },
+      { name: '🎤 Artist', value: track.author || 'Unknown', inline: true },
+      { name: '⏱️ Duration', value: formatDuration(track.length), inline: true },
+      { name: `${emoji} Source`, value: sourceName, inline: true },
+      { name: '👤 Requested By', value: requesterTag, inline: true },
+      { name: '🔊 Volume', value: `${player.volume}%`, inline: true },
+      { name: '📋 Up Next', value: player.queue.size > 0 ? `${player.queue.size} track(s)` : 'Nothing', inline: true },
     )
-    .setImage(thumbnail)
+    .setThumbnail(thumbnail)
     .setFooter({ text: config.embeds.footerText })
     .setTimestamp();
 }
 
-module.exports = { formatDuration, buildEmbed, buildErrorEmbed, buildNowPlayingEmbed };
+/**
+ * Build the "Queue Concluded" embed shown when the queue is empty
+ * @returns {EmbedBuilder}
+ */
+function buildQueueConcludedEmbed() {
+  return new EmbedBuilder()
+    .setColor(config.embeds.color)
+    .setAuthor({ name: '⏹️ Queue Concluded' })
+    .setTitle('The queue has ended')
+    .setDescription('All tracks have been played. Use `/play` to add more music!')
+    .setFooter({ text: config.embeds.footerText })
+    .setTimestamp();
+}
+
+module.exports = {
+  formatDuration,
+  buildEmbed,
+  buildErrorEmbed,
+  resolvePlatformEmoji,
+  buildNowPlayingEmbed,
+  buildQueueConcludedEmbed,
+};

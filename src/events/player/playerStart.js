@@ -1,6 +1,5 @@
-const { buildNowPlayingEmbed } = require('../../utils/embeds');
+const { buildNowPlayingEmbed, resolvePlatformEmoji } = require('../../utils/embeds');
 const { buildPlayerButtons } = require('../../utils/functions');
-const config = require('../../../config');
 
 module.exports = {
   /**
@@ -16,31 +15,47 @@ module.exports = {
     if (!channel?.isTextBased()) return;
 
     try {
-      // Determine the platform emoji based on the track's source.
-      // sourceName values from Lavalink/LavaSrc (e.g. 'spotify', 'youtube', 'youtubemusic').
-      const sourceMap = {
-        spotify: config.emojis.platforms.spotify,
-        jiosaavn: config.emojis.platforms.jiosaavn,
-        'apple music': config.emojis.platforms.applemusic,
-        applemusic: config.emojis.platforms.applemusic,
-        soundcloud: config.emojis.platforms.soundcloud,
-        'amazon music': config.emojis.platforms.amazonmusic,
-        amazonmusic: config.emojis.platforms.amazonmusic,
-        deezer: config.emojis.platforms.deezer,
-        youtube: config.emojis.platforms.youtube,
-        youtubemusic: config.emojis.platforms.youtubemusic,
-      };
-      const sourceName = (track.sourceName || '').toLowerCase();
-      const platformEmoji = sourceMap[sourceName] || config.emojis.music;
-
+      const platformEmoji = resolvePlatformEmoji(track.sourceName);
       const embed = buildNowPlayingEmbed(track, player, platformEmoji);
       const row = buildPlayerButtons(player);
 
-      const msg = await channel.send({ embeds: [embed], components: [row] });
-      // Store the now-playing message so we can edit it later (e.g. when pausing via buttons)
-      player.data.set('nowPlayingMessage', msg);
+      // Try to edit the existing now-playing message instead of spamming new ones
+      const existingMsgId = player.data.get('nowPlayingMessageId');
+      let nowPlayingMsg = null;
+
+      if (existingMsgId) {
+        try {
+          const fetched = await channel.messages.fetch(existingMsgId);
+          if (fetched?.editable) {
+            await fetched.edit({ embeds: [embed], components: [row] });
+            nowPlayingMsg = fetched;
+          }
+        } catch {
+          // Message was deleted or not fetchable – fall through to send a new one
+        }
+      }
+
+      if (!nowPlayingMsg) {
+        nowPlayingMsg = await channel.send({ embeds: [embed], components: [row] });
+        player.data.set('nowPlayingMessageId', nowPlayingMsg.id);
+      }
+
+      // Keep a soft reference to the message for immediate edits (e.g. button presses)
+      player.data.set('nowPlayingMessage', nowPlayingMsg);
+
+      // ── Auto-update Voice Channel Status ────────────────────────────────
+      try {
+        const voiceChannelId = player.voiceId;
+        if (voiceChannelId) {
+          await client.rest.put(`/channels/${voiceChannelId}/voice-status`, {
+            body: { status: `🎵 Playing: ${track.title}` },
+          });
+        }
+      } catch {
+        // Non-fatal – bot may lack ManageChannels permission
+      }
     } catch (error) {
-      console.error('[playerStart] Error sending now-playing embed:', error);
+      console.error('[playerStart] Error updating now-playing message:', error);
     }
   },
 };
