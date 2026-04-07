@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { buildErrorEmbed, resolvePlatformEmoji, resolveSourceDisplayName, formatDuration } = require('../utils/embeds');
-const { buildPlayerButtonsV2, buildQueueV2, buildPlayNextConfirmV2 } = require('../utils/componentBuilder');
-const { getSettings } = require('../utils/setupManager');
+const { buildPlayerButtonsV2, buildQueueV2, buildPlayNextConfirmV2, buildNowPlayingV2, buildSetupNowPlayingV2, buildSetupButtonsV2, extractDominantColor } = require('../utils/componentBuilder');
+const { getSettings, getSetup } = require('../utils/setupManager');
 const config = require('../../config');
 
 /**
@@ -136,8 +136,15 @@ module.exports = (client) => {
             // Update the Now Playing message to reflect the new loop state
             try {
               const settings = getSettings(interaction.guild.id);
-              const { buildNowPlayingV2 } = require('../utils/componentBuilder');
-              const payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+              const setupInfo = getSetup(interaction.guild.id);
+              let payload;
+              if (setupInfo && interaction.message?.id === setupInfo.messageId) {
+                const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+                const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+                payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+              } else {
+                payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+              }
               await interaction.update(payload);
             } catch {
               await interaction.deferUpdate().catch(() => {});
@@ -207,20 +214,8 @@ module.exports = (client) => {
           case 'view_queue': {
             await interaction.deferUpdate();
             const tracks = [...player.queue];
-            const trackList = tracks.slice(0, 10).map((t, i) => {
-              const emoji = resolvePlatformEmoji(t.sourceName);
-              return `**${i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
-            }).join('\n') || '*No upcoming tracks.*';
-
-            const queueEmbed = new EmbedBuilder()
-              .setColor(config.embeds.color)
-              .setAuthor({ name: `${config.emojis.queue} Current Queue` })
-              .setDescription(
-                `**Now Playing:** ${resolvePlatformEmoji(player.queue.current.sourceName)} ${player.queue.current.title}\n\n${trackList}`,
-              )
-              .setFooter({ text: `${tracks.length} upcoming track(s) • ${config.embeds.footerText}` });
-
-            await interaction.followUp({ embeds: [queueEmbed], ephemeral: true });
+            const queuePayload = buildQueueV2(player.queue.current, tracks, 1);
+            await interaction.followUp({ ...queuePayload, ephemeral: true });
             break;
           }
 
@@ -271,9 +266,30 @@ module.exports = (client) => {
       try {
         switch (customId) {
           case 'player_previous': {
-            const prev = player.queue.previous;
-            if (!prev) break;
-            await player.play(prev, { replaceCurrent: true });
+            // player.queue.previous is an array (most recent first)
+            const hasPrev = Array.isArray(player.queue.previous)
+              ? player.queue.previous.length > 0
+              : player.queue.previous != null;
+
+            if (!hasPrev) {
+              // No previous track — restart current from 0:00
+              await player.shoukaku.seekTo(0);
+            } else {
+              // Use Kazagumo's getPrevious(true) to remove and return the most recent history entry.
+              // Fall back to manual array shift for compatibility.
+              let prevTrack;
+              if (typeof player.getPrevious === 'function') {
+                prevTrack = player.getPrevious(true);
+              } else if (Array.isArray(player.queue.previous)) {
+                prevTrack = player.queue.previous.shift();
+              }
+
+              if (prevTrack) {
+                // replaceCurrent: false → current song is unshifted back to position 0
+                // of the queue so it can still be played after the previous track
+                await player.play(prevTrack, { replaceCurrent: false });
+              }
+            }
             break;
           }
           case 'player_pause': {
@@ -294,8 +310,17 @@ module.exports = (client) => {
         // Update the button row on the now-playing message to reflect new state
         if (interaction.message?.editable && player.queue.current) {
           const settings = getSettings(guild.id);
-          const { buildNowPlayingV2 } = require('../utils/componentBuilder');
-          const payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+          const setupInfo = getSetup(guild.id);
+
+          let payload;
+          if (setupInfo && interaction.message.id === setupInfo.messageId) {
+            // Setup channel panel — use setup-specific builder
+            const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+            const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+            payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+          } else {
+            payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+          }
           await interaction.message.edit(payload).catch(() => {});
         }
       } catch (error) {

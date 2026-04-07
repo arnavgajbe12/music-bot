@@ -11,7 +11,8 @@ module.exports = {
     ),
 
   async run(client, interaction) {
-    await interaction.deferReply();
+    // Ephemeral defer so only the invoking user sees the queue
+    await interaction.deferReply({ ephemeral: true });
 
     const player = client.manager.players.get(interaction.guild.id);
     if (!player || !player.queue.current) {

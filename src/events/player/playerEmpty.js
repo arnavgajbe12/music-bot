@@ -1,4 +1,4 @@
-const { buildIdleV2 } = require('../../utils/componentBuilder');
+const { buildIdleV2, buildSetupIdleV2 } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
 const config = require('../../../config');
 
@@ -11,7 +11,11 @@ module.exports = {
     const guildId = player.guildId;
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
-    const payload = buildIdleV2(config.images.defaultThumbnail, settings.largeArt);
+
+    // Choose idle payload based on whether a setup panel exists
+    const payload = setupInfo
+      ? buildSetupIdleV2()
+      : buildIdleV2(config.images.defaultThumbnail, settings.largeArt);
 
     // Edit the now-playing message / setup panel to idle state
     const msg = player.data.get('nowPlayingMessage');

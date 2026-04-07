@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
 const { buildSetupIdleV2 } = require('../../../utils/componentBuilder');
-const { saveSetup, removeSetup, getSettings } = require('../../../utils/setupManager');
+const { saveSetup, removeSetup } = require('../../../utils/setupManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -40,8 +40,7 @@ module.exports = {
       });
     }
 
-    const settings = getSettings(interaction.guild.id);
-    const payload = buildSetupIdleV2(settings.largeArt);
+    const payload = buildSetupIdleV2();
 
     let panelMsg;
     try {

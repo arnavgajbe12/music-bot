@@ -19,6 +19,7 @@ const {
   StringSelectMenuOptionBuilder,
   MessageFlags,
 } = require('discord.js');
+const Vibrant = require('node-vibrant');
 const config = require('../../config');
 const { formatDuration, resolvePlatformEmoji, resolveSourceDisplayName } = require('./embeds');
 
@@ -30,6 +31,36 @@ const SELECT_OPTION_MAX_LENGTH = 100;
 /** Auto-delete delay (ms) for ephemeral "play next" confirmation messages. */
 const PLAY_NEXT_DELETE_DELAY_MS = 15000;
 
+// ─── Color Extraction ─────────────────────────────────────────────────────────
+
+/**
+ * Extract the dominant accent color from a thumbnail URL using node-vibrant.
+ * Falls back to a random vivid HEX color on any failure.
+ * @param {string} imageUrl - URL of the track thumbnail
+ * @returns {Promise<number>} Integer color suitable for setAccentColor / setColor
+ */
+async function extractDominantColor(imageUrl) {
+  try {
+    if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error('invalid url');
+    const palette = await Vibrant.from(imageUrl).getPalette();
+    const swatch =
+      palette.Vibrant ||
+      palette.LightVibrant ||
+      palette.DarkVibrant ||
+      palette.Muted ||
+      palette.LightMuted ||
+      palette.DarkMuted;
+    if (swatch) {
+      const [r, g, b] = swatch.getRgb();
+      return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+    }
+  } catch {
+    // Fall through to random color
+  }
+  // Random vivid color as fallback
+  return Math.floor(Math.random() * 0xffffff);
+}
+
 // ─── Button Builders ──────────────────────────────────────────────────────────
 
 /**
@@ -38,7 +69,9 @@ const PLAY_NEXT_DELETE_DELAY_MS = 15000;
  * @returns {ActionRowBuilder}
  */
 function buildPlayerButtonsV2(player) {
-  const hasPrevious = player.queue.previous !== null && player.queue.previous !== undefined;
+  const hasPrevious = Array.isArray(player.queue.previous)
+    ? player.queue.previous.length > 0
+    : player.queue.previous != null;
   const isPaused = player.paused;
 
   return new ActionRowBuilder().addComponents(
@@ -229,13 +262,172 @@ function buildIdleV2(artUrl, largeArt = true) {
   };
 }
 
+// ─── Setup Channel Builders ───────────────────────────────────────────────────
+
 /**
- * Build the initial Setup Panel (idle, no track playing).
- * @param {boolean} [largeArt=true]
+ * Build the Setup Channel 4-button control row.
+ * All buttons are the same style (Secondary/Grey), except Pause toggles to
+ * Success (green) when the player is paused and Stop is always Danger (red).
+ * @param {object} player - KazagumoPlayer
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupButtonsV2(player) {
+  const hasPrevious = Array.isArray(player.queue.previous)
+    ? player.queue.previous.length > 0
+    : player.queue.previous != null;
+  const isPaused = player.paused;
+
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('player_previous')
+      .setEmoji(config.emojis.previous)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!hasPrevious),
+    new ButtonBuilder()
+      .setCustomId('player_pause')
+      .setEmoji(isPaused ? config.emojis.play : config.emojis.pause)
+      .setStyle(isPaused ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('player_skip')
+      .setEmoji(config.emojis.skip)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('player_stop')
+      .setEmoji(config.emojis.stop)
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
+/**
+ * Build the Setup Channel disabled button row (for idle state).
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupDisabledButtonsV2() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('player_previous')
+      .setEmoji(config.emojis.previous)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_pause')
+      .setEmoji(config.emojis.play)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_skip')
+      .setEmoji(config.emojis.skip)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_stop')
+      .setEmoji(config.emojis.stop)
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(true),
+  );
+}
+
+/**
+ * Build the Setup Channel Now Playing Component v2 panel.
+ * This is the permanent panel in the song-request channel.
+ *
+ * Layout:
+ *  - Dynamic accent color (extracted from thumbnail, random on failure)
+ *  - Header (medium text): [Emoji] Source Name - Song Title  ← clickable link
+ *  - Large image: track thumbnail
+ *  - Body (large text): ## Song Title  (no link)
+ *  - Subtext: Artist • Duration
+ *  - Separator
+ *  - 4 uniform-color buttons: ⏮️ Previous | ⏯️ Pause | ⏭️ Skip | ⏹️ Stop
+ *
+ * NOTE: No user pings anywhere.
+ *
+ * @param {object} track  - KazagumoTrack
+ * @param {object} player - KazagumoPlayer
+ * @param {number} [accentColor] - Pre-computed accent color (integer). If omitted
+ *   the function will attempt extraction asynchronously — caller should pass the
+ *   result of `extractDominantColor` to avoid blocking.
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
-function buildSetupIdleV2(largeArt = true) {
-  return buildIdleV2(config.images.defaultThumbnail, largeArt);
+function buildSetupNowPlayingV2(track, player, accentColor) {
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
+  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const trackUrl = track.uri || null;
+
+  // Clickable header: [🔴 YouTube Music - Blinding Lights](https://...)
+  const headerText = trackUrl
+    ? `[${platformEmoji} ${sourceDisplay} - ${track.title}](${trackUrl})`
+    : `${platformEmoji} ${sourceDisplay} - ${track.title}`;
+
+  const container = new ContainerBuilder();
+
+  // Apply accent color (left color stripe)
+  const color =
+    accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
+  container.setAccentColor(color);
+
+  // Small clickable header line
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(headerText),
+  );
+
+  // Large thumbnail image
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+  );
+
+  // Large song title (## = large text, no link)
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${track.title}`),
+  );
+
+  // Artist • Duration subtext
+  const artist = track.author || 'Unknown Artist';
+  const duration = formatDuration(track.length);
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`${artist} • ${duration}`),
+  );
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+  container.addActionRowComponents(buildSetupButtonsV2(player));
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+/**
+ * Build the Setup Channel idle/waiting panel (no track playing).
+ * Shown when the bot is not playing anything in a guild with a setup channel.
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildSetupIdleV2() {
+  const imageUrl = config.images.defaultThumbnail;
+  const container = new ContainerBuilder();
+
+  container.setAccentColor(config.embeds.color);
+
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)),
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('## Waiting for music...'),
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('Use `!play` or `/play` to start playing a song.'),
+  );
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+  container.addActionRowComponents(buildSetupDisabledButtonsV2());
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 /**
@@ -501,6 +693,10 @@ module.exports = {
   buildAddedPlaylistV2,
   buildIdleV2,
   buildSetupIdleV2,
+  buildSetupNowPlayingV2,
+  buildSetupButtonsV2,
+  buildSetupDisabledButtonsV2,
+  extractDominantColor,
   buildQueueV2,
   buildPlayNextConfirmV2,
   QUEUE_PAGE_SIZE,
