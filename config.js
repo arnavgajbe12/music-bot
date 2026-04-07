@@ -10,7 +10,7 @@ module.exports = {
   },
 
   player: {
-    defaultSearchPlatform: 'spsearch',
+    defaultSearchPlatform: 'ytmsearch',
     defaultVolume: 100,
     leaveOnEmpty: true,
   },
@@ -35,6 +35,16 @@ module.exports = {
     queue: '📋',
     volumeUp: '🔊',
     volumeDown: '🔉',
+    platforms: {
+      spotify: '🟢',
+      jiosaavn: '🎵',
+      applemusic: '🍎',
+      soundcloud: '🔶',
+      amazonmusic: '📦',
+      deezer: '🎶',
+      youtube: '▶️',
+      youtubemusic: '▶️',
+    },
   },
 
   images: {

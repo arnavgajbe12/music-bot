@@ -1,5 +1,6 @@
 const { buildNowPlayingEmbed } = require('../../utils/embeds');
 const { buildPlayerButtons } = require('../../utils/functions');
+const config = require('../../../config');
 
 module.exports = {
   /**
@@ -15,7 +16,24 @@ module.exports = {
     if (!channel?.isTextBased()) return;
 
     try {
-      const embed = buildNowPlayingEmbed(track, player);
+      // Determine the platform emoji based on the track's source.
+      // sourceName values from Lavalink/LavaSrc (e.g. 'spotify', 'youtube', 'youtubemusic').
+      const sourceMap = {
+        spotify: config.emojis.platforms.spotify,
+        jiosaavn: config.emojis.platforms.jiosaavn,
+        'apple music': config.emojis.platforms.applemusic,
+        applemusic: config.emojis.platforms.applemusic,
+        soundcloud: config.emojis.platforms.soundcloud,
+        'amazon music': config.emojis.platforms.amazonmusic,
+        amazonmusic: config.emojis.platforms.amazonmusic,
+        deezer: config.emojis.platforms.deezer,
+        youtube: config.emojis.platforms.youtube,
+        youtubemusic: config.emojis.platforms.youtubemusic,
+      };
+      const sourceName = (track.sourceName || '').toLowerCase();
+      const platformEmoji = sourceMap[sourceName] || config.emojis.music;
+
+      const embed = buildNowPlayingEmbed(track, player, platformEmoji);
       const row = buildPlayerButtons(player);
 
       const msg = await channel.send({ embeds: [embed], components: [row] });

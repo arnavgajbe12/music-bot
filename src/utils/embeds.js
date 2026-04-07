@@ -50,16 +50,18 @@ function buildErrorEmbed(description) {
  * Build a Now Playing embed
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
+ * @param {string} [platformEmoji] - Emoji representing the source platform
  * @returns {EmbedBuilder}
  */
-function buildNowPlayingEmbed(track, player) {
+function buildNowPlayingEmbed(track, player, platformEmoji) {
   const thumbnail = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const requester = track.requester;
   const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
+  const emoji = platformEmoji || config.emojis.music;
 
   return new EmbedBuilder()
     .setColor(config.embeds.color)
-    .setTitle(`${config.emojis.music} Now Playing`)
+    .setTitle(`${emoji} Now Playing`)
     .setDescription(`**[${track.title}](${track.uri})**`)
     .addFields(
       { name: 'Artist', value: track.author || 'Unknown', inline: true },

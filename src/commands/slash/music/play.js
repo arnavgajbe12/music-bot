@@ -19,7 +19,11 @@ module.exports = {
       return interaction.editReply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
-    const query = interaction.options.getString('query');
+    const rawQuery = interaction.options.getString('query');
+    // If the query is a plain search term (not a URL), prefix it so Kazagumo/LavaSrc
+    // routes it through YouTube Music by default.
+    const isUrl = /^https?:\/\//i.test(rawQuery);
+    const query = isUrl ? rawQuery : `ytmsearch:${rawQuery}`;
     const voiceChannel = interaction.member.voice.channel;
 
     let player = client.manager.players.get(interaction.guild.id);
