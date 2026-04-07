@@ -13,18 +13,19 @@ const CATEGORIES = {
     emoji: config.emojis.music,
     description: 'Commands for controlling music playback',
     commands: [
-      { name: 'play', desc: 'Play a song or add it to the queue', usage: '/play <query>' },
-      { name: 'pause', desc: 'Pause or resume the current track', usage: '/pause' },
-      { name: 'skip', desc: 'Skip the current track', usage: '/skip' },
-      { name: 'stop', desc: 'Stop music and clear the queue', usage: '/stop' },
-      { name: 'queue', desc: 'View the current queue', usage: '/queue [page]' },
-      { name: 'nowplaying', desc: 'Show the currently playing track', usage: '/nowplaying' },
-      { name: 'volume', desc: 'Adjust the player volume', usage: '/volume <1-200>' },
-      { name: 'loop', desc: 'Toggle track/queue loop mode', usage: '/loop [track|queue|off]' },
-      { name: 'shuffle', desc: 'Shuffle the queue', usage: '/shuffle' },
-      { name: 'clear', desc: 'Clear the queue', usage: '/clear' },
-      { name: 'remove', desc: 'Remove a track from the queue', usage: '/remove <position>' },
-      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '/autoplay' },
+      { name: 'play', desc: 'Play a song or add it to the queue', usage: '!play <query>' },
+      { name: 'pause', desc: 'Pause or resume the current track', usage: '!pause' },
+      { name: 'skip', desc: 'Skip the current track', usage: '!skip' },
+      { name: 'stop', desc: 'Stop music and clear the queue', usage: '!stop' },
+      { name: 'queue', desc: 'View the current queue', usage: '!queue [page]' },
+      { name: 'nowplaying', desc: 'Show the currently playing track', usage: '!nowplaying' },
+      { name: 'volume', desc: 'Adjust the player volume', usage: '!volume <1-200>' },
+      { name: 'loop', desc: 'Toggle track/queue loop mode', usage: '!loop [track|queue|off]' },
+      { name: 'shuffle', desc: 'Shuffle the queue', usage: '!shuffle' },
+      { name: 'clear', desc: 'Clear the queue', usage: '!clear' },
+      { name: 'remove', desc: 'Remove a track from the queue', usage: '!remove <position>' },
+      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '!autoplay' },
+      { name: 'playnext', desc: 'Add a song to play next in the queue', usage: '!playnext <query>' },
     ],
   },
   platform: {
@@ -32,13 +33,13 @@ const CATEGORIES = {
     emoji: '🔍',
     description: 'Force search on a specific streaming platform',
     commands: [
-      { name: 'yt', desc: 'Search and play from YouTube', usage: '/yt <query>' },
-      { name: 'ytm', desc: 'Search and play from YouTube Music', usage: '/ytm <query>' },
-      { name: 'sp', desc: 'Search and play from Spotify', usage: '/sp <query>' },
-      { name: 'ap', desc: 'Search and play from Apple Music', usage: '/ap <query>' },
-      { name: 'sc', desc: 'Search and play from SoundCloud', usage: '/sc <query>' },
-      { name: 'dz', desc: 'Search and play from Deezer', usage: '/dz <query>' },
-      { name: 'az', desc: 'Search and play from Amazon Music', usage: '/az <query>' },
+      { name: 'yt', desc: 'Search and play from YouTube', usage: '!yt <query>' },
+      { name: 'ytm', desc: 'Search and play from YouTube Music', usage: '!ytm <query>' },
+      { name: 'sp', desc: 'Search and play from Spotify', usage: '!sp <query>' },
+      { name: 'ap', desc: 'Search and play from Apple Music', usage: '!ap <query>' },
+      { name: 'sc', desc: 'Search and play from SoundCloud', usage: '!sc <query>' },
+      { name: 'dz', desc: 'Search and play from Deezer', usage: '!dz <query>' },
+      { name: 'az', desc: 'Search and play from Amazon Music', usage: '!az <query>' },
     ],
   },
   setup: {
@@ -46,10 +47,10 @@ const CATEGORIES = {
     emoji: '⚙️',
     description: 'Configure the Song Request channel panel',
     commands: [
-      { name: 'setup channel', desc: 'Set a dedicated song request channel with a permanent control panel', usage: '/setup channel <#channel>' },
-      { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '/setup remove' },
-      { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '/largeart <on|off>' },
-      { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '/source' },
+      { name: 'setup', desc: 'Set a dedicated song request channel with a permanent control panel', usage: '!setup <#channel>' },
+      { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '!setup remove' },
+      { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '!largeart <on|off>' },
+      { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '!source' },
     ],
   },
   dj: {
@@ -57,9 +58,10 @@ const CATEGORIES = {
     emoji: '🎧',
     description: 'DJ & advanced player controls',
     commands: [
-      { name: '247', desc: 'Toggle 24/7 mode (bot stays in VC)', usage: '/247' },
-      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '/autoplay' },
-      { name: 'vcstatus', desc: 'Set or clear the voice channel status', usage: '/vcstatus [text]' },
+      { name: '247', desc: 'Toggle 24/7 mode (bot stays in VC)', usage: '!247' },
+      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '!autoplay' },
+      { name: 'vcstatus', desc: 'Set or clear the voice channel status', usage: '!vcstatus [text]' },
+      { name: 'nodes', desc: 'Show Lavalink node statistics', usage: '!nodes' },
     ],
   },
   general: {
@@ -67,8 +69,8 @@ const CATEGORIES = {
     emoji: '🤖',
     description: 'General bot commands',
     commands: [
-      { name: 'help', desc: 'Show this help menu', usage: '/help' },
-      { name: 'ping', desc: "Check the bot's latency", usage: '/ping' },
+      { name: 'help', desc: 'Show this help menu', usage: '!help [category]' },
+      { name: 'ping', desc: "Check the bot's latency", usage: '!ping' },
     ],
   },
 };
@@ -86,7 +88,7 @@ function buildCategoryEmbed(categoryKey) {
   return new EmbedBuilder()
     .setColor(config.embeds.color)
     .setAuthor({ name: `${cat.emoji} ${cat.label} Commands` })
-    .setDescription(cat.description)
+    .setDescription(`${cat.description}\n\n> **Tip:** All commands also work as slash commands. Type \`/\` in chat to see them.`)
     .addFields(fields)
     .setFooter({ text: `${config.embeds.footerText} • Use the dropdown below to switch categories` })
     .setTimestamp();

@@ -1,8 +1,7 @@
 const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
-const { checkVoice } = require('../../../utils/functions');
+const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
-const config = require('../../../../config');
 
 module.exports = {
   name: 'play',
@@ -55,18 +54,28 @@ module.exports = {
       }
     }
 
-    // Use the guild's stored playback source, or fall back to config default
+    // Use per-guild playback source if set, otherwise use the ytmsearch → ytsearch → scsearch fallback
     const settings = getSettings(message.guild.id);
-    const searchPrefix = settings.playbackSource || `${config.player.defaultSearchPlatform}:`;
-    const isUrl = /^https?:\/\//i.test(rawQuery);
-    const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
-
     let result;
     try {
-      result = await client.manager.search(query, { requester: message.author });
-    } catch (error) {
-      console.error('[prefix play] Search error:', error);
-      return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      if (settings.playbackSource) {
+        const isUrl = /^https?:\/\//i.test(rawQuery);
+        const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
+        result = await client.manager.search(query, { requester: message.author });
+        // If no tracks found with configured source, fall back to the default chain
+        if (!result || !result.tracks.length) {
+          result = await searchWithFallback(client.manager, rawQuery, message.author);
+        }
+      } else {
+        result = await searchWithFallback(client.manager, rawQuery, message.author);
+      }
+    } catch {
+      try {
+        result = await searchWithFallback(client.manager, rawQuery, message.author);
+      } catch (err) {
+        console.error('[prefix play] Search error:', err);
+        return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      }
     }
 
     if (!result || !result.tracks.length) {
@@ -91,7 +100,7 @@ module.exports = {
       const track = result.tracks[0];
       player.queue.add(track);
       if (!wasIdle) {
-        const queueSize = player.queue.size;
+        const queueSize = player.queue.size ?? player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         const reply = await message.reply(payload);
         setTimeout(() => reply.delete().catch(() => {}), 15000);

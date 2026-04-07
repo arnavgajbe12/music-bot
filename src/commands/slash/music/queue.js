@@ -18,7 +18,7 @@ module.exports = {
       return interaction.editReply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
-    const tracks = player.queue.tracks ?? [];
+    const tracks = [...player.queue];
     const page = interaction.options.getInteger('page') || 1;
     const payload = buildQueueV2(player.queue.current, tracks, page);
 

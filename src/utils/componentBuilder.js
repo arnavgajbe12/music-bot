@@ -33,14 +33,13 @@ const PLAY_NEXT_DELETE_DELAY_MS = 15000;
 // ─── Button Builders ──────────────────────────────────────────────────────────
 
 /**
- * Build the full music player control row (with loop button).
+ * Build the music player control row (without loop button — loop is in the dropdown).
  * @param {object} player - KazagumoPlayer
  * @returns {ActionRowBuilder}
  */
 function buildPlayerButtonsV2(player) {
   const hasPrevious = player.queue.previous !== null && player.queue.previous !== undefined;
   const isPaused = player.paused;
-  const isLooping = player.loop && player.loop !== 'none';
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -60,10 +59,6 @@ function buildPlayerButtonsV2(player) {
       .setCustomId('player_stop')
       .setEmoji(config.emojis.stop)
       .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('player_loop')
-      .setEmoji(config.emojis.loop)
-      .setStyle(isLooping ? ButtonStyle.Success : ButtonStyle.Secondary),
   );
 }
 
@@ -93,11 +88,40 @@ function buildDisabledButtonsV2() {
       .setEmoji(config.emojis.stop)
       .setStyle(ButtonStyle.Danger)
       .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('player_loop')
-      .setEmoji(config.emojis.loop)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
+  );
+}
+
+/**
+ * Build the "More Options" dropdown (replaces the old Loop button).
+ * @returns {ActionRowBuilder}
+ */
+function buildMoreOptionsDropdown() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('player_more_options')
+      .setPlaceholder('⚙️ More Options')
+      .addOptions([
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Loop Mode')
+          .setEmoji('🔁')
+          .setDescription('Toggle between Track, Queue, and Off')
+          .setValue('loop_toggle'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Song Info')
+          .setEmoji('ℹ️')
+          .setDescription('Show detailed track info and a link')
+          .setValue('song_info'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Shuffle')
+          .setEmoji('🔀')
+          .setDescription('Shuffle the current queue')
+          .setValue('shuffle_queue'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('View Queue')
+          .setEmoji('📜')
+          .setDescription('Show the upcoming queue')
+          .setValue('view_queue'),
+      ]),
   );
 }
 
@@ -114,49 +138,49 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const requester = track.requester;
-  const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
+  const requesterName = requester
+    ? requester.displayName || requester.username || requester.tag || 'Unknown'
+    : 'Unknown';
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+
+  // Dynamic small status line shown above the (large) song title
+  const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+  const statusText = isPaused
+    ? `${platformEmoji} **Paused**${loopMode}`
+    : `${platformEmoji} **Now Playing**${loopMode}`;
 
   const container = new ContainerBuilder();
 
-  // Header
+  // Small dynamic status header
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${config.emojis.music} Now Playing${loopMode}`),
+    new TextDisplayBuilder().setContent(statusText),
   );
+
+  const detailText =
+    `## ${track.title}\n` +
+    `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+    `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+    `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+    `👤 **Requested by:** ${requesterName}`;
 
   if (largeArt) {
     // Large album art as gallery
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
     );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `### ${track.title}\n` +
-          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
-          `👤 **Requested by:** ${requesterTag}`,
-      ),
-    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
   } else {
     // Small thumbnail in a section accessory
     const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          `### ${track.title}\n` +
-            `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-            `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-            `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
-            `👤 **Requested by:** ${requesterTag}`,
-        ),
-      )
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
     container.addSectionComponents(section);
   }
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildPlayerButtonsV2(player));
+  container.addActionRowComponents(buildMoreOptionsDropdown());
 
   return {
     components: [container],
@@ -175,7 +199,7 @@ function buildIdleV2(artUrl, largeArt = true) {
   const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${config.emojis.music} Queue Concluded`),
+    new TextDisplayBuilder().setContent(`${config.emojis.stop} **Queue Concluded**`),
   );
 
   if (largeArt) {
@@ -183,13 +207,13 @@ function buildIdleV2(artUrl, largeArt = true) {
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)),
     );
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('All tracks have been played.\nUse `/play` or type a song name to add more music!'),
+      new TextDisplayBuilder().setContent('All tracks have been played.\nUse `!play` or `/play` to add more music!'),
     );
   } else {
     const section = new SectionBuilder()
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          'All tracks have been played.\nUse `/play` or type a song name to add more music!',
+          'All tracks have been played.\nUse `!play` or `/play` to add more music!',
         ),
       )
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(imageUrl));
@@ -227,9 +251,16 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const requester = track.requester;
-  const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
+  const requesterName = requester
+    ? requester.displayName || requester.username || requester.tag || 'Unknown'
+    : 'Unknown';
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+
+  const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+  const statusText = isPaused
+    ? `${platformEmoji} **Paused**${loopMode}`
+    : `${platformEmoji} **Now Playing**${loopMode}`;
 
   const position = player.position || 0;
   const total = track.length || 0;
@@ -238,33 +269,24 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${config.emojis.music} Now Playing${loopMode}`),
+    new TextDisplayBuilder().setContent(statusText),
   );
+
+  const detailText =
+    `## ${track.title}\n` +
+    `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+    `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+    `⏱️ **Progress:** ${progressStr}\n` +
+    `👤 **Requested by:** ${requesterName}`;
 
   if (largeArt) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
     );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `### ${track.title}\n` +
-          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-          `⏱️ **Progress:** ${progressStr}\n` +
-          `👤 **Requested by:** ${requesterTag}`,
-      ),
-    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
   } else {
     const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          `### ${track.title}\n` +
-            `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-            `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-            `⏱️ **Progress:** ${progressStr}\n` +
-            `👤 **Requested by:** ${requesterTag}`,
-        ),
-      )
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
     container.addSectionComponents(section);
   }
@@ -472,6 +494,7 @@ function buildPlayNextConfirmV2(track) {
 module.exports = {
   buildPlayerButtonsV2,
   buildDisabledButtonsV2,
+  buildMoreOptionsDropdown,
   buildNowPlayingV2,
   buildNowPlayingV2NoButtons,
   buildAddedToQueueV2,

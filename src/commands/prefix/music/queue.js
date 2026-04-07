@@ -13,7 +13,7 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
-    const tracks = player.queue.tracks ?? [];
+    const tracks = [...player.queue];
     const page = Math.max(1, parseInt(args[0]) || 1);
     const payload = buildQueueV2(player.queue.current, tracks, page);
 
