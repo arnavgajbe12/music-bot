@@ -1,5 +1,6 @@
 const { buildErrorEmbed } = require('../utils/embeds');
-const { buildPlayerButtons } = require('../utils/functions');
+const { buildPlayerButtonsV2 } = require('../utils/componentBuilder');
+const { getSettings } = require('../utils/setupManager');
 
 /**
  * @param {import('discord.js').Client} client
@@ -46,7 +47,8 @@ module.exports = (client) => {
     if (interaction.isButton()) {
       const { customId, guild, member } = interaction;
 
-      if (!['player_previous', 'player_pause', 'player_skip', 'player_stop'].includes(customId)) return;
+      const validIds = ['player_previous', 'player_pause', 'player_skip', 'player_stop', 'player_loop'];
+      if (!validIds.includes(customId)) return;
 
       const player = client.manager.players.get(guild.id);
       if (!player) {
@@ -85,12 +87,24 @@ module.exports = (client) => {
             await player.skip();
             break;
           }
+          case 'player_loop': {
+            // Cycle: none → track → queue → none
+            const current = player.loop || 'none';
+            let newMode;
+            if (current === 'none') newMode = 'track';
+            else if (current === 'track') newMode = 'queue';
+            else newMode = 'none';
+            player.setLoop(newMode);
+            break;
+          }
         }
 
-        // Update the button row to reflect new state
-        if (interaction.message?.editable) {
-          const newRow = buildPlayerButtons(player);
-          await interaction.message.edit({ components: [newRow] }).catch(() => {});
+        // Update the button row on the now-playing message to reflect new state
+        if (interaction.message?.editable && player.queue.current) {
+          const settings = getSettings(guild.id);
+          const { buildNowPlayingV2 } = require('../utils/componentBuilder');
+          const payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+          await interaction.message.edit(payload).catch(() => {});
         }
       } catch (error) {
         console.error('[InteractionHandler] Button error:', error);
