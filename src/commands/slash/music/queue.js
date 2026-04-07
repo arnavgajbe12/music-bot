@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { buildErrorEmbed, formatDuration } = require('../../../utils/embeds');
-const config = require('../../../../config');
+const { SlashCommandBuilder } = require('discord.js');
+const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildQueueV2 } = require('../../../utils/componentBuilder');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,29 +19,9 @@ module.exports = {
     }
 
     const tracks = player.queue.tracks ?? [];
-    const current = player.queue.current;
-    const tracksPerPage = 10;
     const page = interaction.options.getInteger('page') || 1;
-    const totalPages = Math.max(1, Math.ceil(tracks.length / tracksPerPage));
-    const clampedPage = Math.min(page, totalPages);
-    const start = (clampedPage - 1) * tracksPerPage;
-    const end = start + tracksPerPage;
+    const payload = buildQueueV2(player.queue.current, tracks, page);
 
-    const queueList = tracks
-      .slice(start, end)
-      .map((track, i) => `**${start + i + 1}.** [${track.title}](${track.uri}) — \`${formatDuration(track.length)}\``)
-      .join('\n');
-
-    const embed = new EmbedBuilder()
-      .setColor(config.embeds.color)
-      .setTitle(`${config.emojis.queue} Music Queue`)
-      .setDescription(
-        `**Now Playing:**\n[${current.title}](${current.uri}) — \`${formatDuration(current.length)}\`\n\n` +
-          (queueList || '*No upcoming tracks.*'),
-      )
-      .setFooter({ text: `Page ${clampedPage}/${totalPages} • ${tracks.length} track(s) in queue • ${config.embeds.footerText}` })
-      .setTimestamp();
-
-    return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply(payload);
   },
 };
