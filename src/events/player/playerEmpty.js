@@ -1,5 +1,5 @@
-const { buildQueueConcludedEmbed } = require('../../utils/embeds');
-const { buildDisabledButtons } = require('../../utils/functions');
+const { buildIdleV2 } = require('../../utils/componentBuilder');
+const { getSetup, getSettings } = require('../../utils/setupManager');
 const config = require('../../../config');
 
 module.exports = {
@@ -8,21 +8,25 @@ module.exports = {
    * @param {import('kazagumo').KazagumoPlayer} player
    */
   async run(client, player) {
-    // Edit the now-playing message to show "Queue Concluded" with disabled buttons
-    const msg = player.data.get('nowPlayingMessage');
-    const disabledRow = buildDisabledButtons();
-    const concludedEmbed = buildQueueConcludedEmbed();
+    const guildId = player.guildId;
+    const settings = getSettings(guildId);
+    const setupInfo = getSetup(guildId);
+    const payload = buildIdleV2(config.images.defaultThumbnail, settings.largeArt);
 
+    // Edit the now-playing message / setup panel to idle state
+    const msg = player.data.get('nowPlayingMessage');
     if (msg?.editable) {
-      await msg.edit({ embeds: [concludedEmbed], components: [disabledRow] }).catch(() => {});
-    } else {
-      // Fallback: if message is gone, post a short notice
-      const channelId = player.data.get('textChannel');
-      const channel = channelId ? client.channels.cache.get(channelId) : null;
-      if (channel?.isTextBased()) {
-        await channel
-          .send(`${config.emojis.music} The queue has ended. See you next time!`)
-          .catch(() => {});
+      await msg.edit(payload).catch(() => {});
+    } else if (setupInfo) {
+      // Re-fetch setup panel if soft ref is gone
+      try {
+        const setupChannel = client.channels.cache.get(setupInfo.channelId);
+        if (setupChannel?.isTextBased()) {
+          const setupMsg = await setupChannel.messages.fetch(setupInfo.messageId).catch(() => null);
+          if (setupMsg?.editable) await setupMsg.edit(payload).catch(() => {});
+        }
+      } catch {
+        // Non-fatal
       }
     }
 
@@ -40,6 +44,9 @@ module.exports = {
     // Clean up stored references
     player.data.delete('nowPlayingMessage');
     player.data.delete('nowPlayingMessageId');
+
+    // Respect 24/7 mode – if enabled, never destroy the player
+    if (settings.mode247) return;
 
     if (config.player.leaveOnEmpty) {
       setTimeout(() => {

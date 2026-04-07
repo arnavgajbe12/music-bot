@@ -24,23 +24,50 @@ const CATEGORIES = {
       { name: 'shuffle', desc: 'Shuffle the queue', usage: '/shuffle' },
       { name: 'clear', desc: 'Clear the queue', usage: '/clear' },
       { name: 'remove', desc: 'Remove a track from the queue', usage: '/remove <position>' },
+      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '/autoplay' },
+    ],
+  },
+  platform: {
+    label: 'Platform Search',
+    emoji: '🔍',
+    description: 'Force search on a specific streaming platform',
+    commands: [
+      { name: 'yt', desc: 'Search and play from YouTube', usage: '/yt <query>' },
+      { name: 'ytm', desc: 'Search and play from YouTube Music', usage: '/ytm <query>' },
+      { name: 'sp', desc: 'Search and play from Spotify', usage: '/sp <query>' },
+      { name: 'ap', desc: 'Search and play from Apple Music', usage: '/ap <query>' },
+      { name: 'sc', desc: 'Search and play from SoundCloud', usage: '/sc <query>' },
+      { name: 'dz', desc: 'Search and play from Deezer', usage: '/dz <query>' },
+      { name: 'az', desc: 'Search and play from Amazon Music', usage: '/az <query>' },
+    ],
+  },
+  setup: {
+    label: 'Setup',
+    emoji: '⚙️',
+    description: 'Configure the Song Request channel panel',
+    commands: [
+      { name: 'setup channel', desc: 'Set a dedicated song request channel with a permanent control panel', usage: '/setup channel <#channel>' },
+      { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '/setup remove' },
+      { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '/largeart <on|off>' },
+    ],
+  },
+  dj: {
+    label: 'DJ',
+    emoji: '🎧',
+    description: 'DJ & advanced player controls',
+    commands: [
+      { name: '247', desc: 'Toggle 24/7 mode (bot stays in VC)', usage: '/247' },
+      { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '/autoplay' },
+      { name: 'vcstatus', desc: 'Set or clear the voice channel status', usage: '/vcstatus [text]' },
     ],
   },
   general: {
     label: 'General',
-    emoji: '⚙️',
+    emoji: '🤖',
     description: 'General bot commands',
     commands: [
       { name: 'help', desc: 'Show this help menu', usage: '/help' },
-      { name: 'ping', desc: 'Check the bot\'s latency', usage: '/ping' },
-    ],
-  },
-  settings: {
-    label: 'Settings',
-    emoji: '🔧',
-    description: 'Bot configuration commands',
-    commands: [
-      { name: 'vcstatus', desc: 'Set or clear the voice channel status', usage: '/vcstatus [text]' },
+      { name: 'ping', desc: "Check the bot's latency", usage: '/ping' },
     ],
   },
 };
@@ -93,8 +120,10 @@ module.exports = {
         .setRequired(false)
         .addChoices(
           { name: 'Music', value: 'music' },
+          { name: 'Platform Search', value: 'platform' },
+          { name: 'Setup', value: 'setup' },
+          { name: 'DJ', value: 'dj' },
           { name: 'General', value: 'general' },
-          { name: 'Settings', value: 'settings' },
         ),
     ),
 

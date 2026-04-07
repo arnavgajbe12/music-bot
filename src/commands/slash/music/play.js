@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
 const { checkVoice } = require('../../../utils/functions');
 
 module.exports = {
@@ -53,13 +53,13 @@ module.exports = {
         player.queue.add(track);
       }
       await interaction.editReply({
-        content: `✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`,
+        embeds: [buildEmbed(`✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`)],
       });
     } else {
       const track = result.tracks[0];
       player.queue.add(track);
       await interaction.editReply({
-        content: `✅ Added **${track.title}** to the queue.`,
+        embeds: [buildEmbed(`✅ Added **${track.title}** to the queue.`)],
       });
     }
 

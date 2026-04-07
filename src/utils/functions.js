@@ -2,13 +2,14 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config');
 
 /**
- * Build the music player control buttons
+ * Build the music player control buttons (includes Loop button)
  * @param {object} player - KazagumoPlayer
  * @returns {ActionRowBuilder}
  */
 function buildPlayerButtons(player) {
   const hasPrevious = player.queue.previous !== null && player.queue.previous !== undefined;
   const isPaused = player.paused;
+  const isLooping = player.loop && player.loop !== 'none';
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -28,6 +29,10 @@ function buildPlayerButtons(player) {
       .setCustomId('player_stop')
       .setEmoji(config.emojis.stop)
       .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('player_loop')
+      .setEmoji(config.emojis.loop)
+      .setStyle(isLooping ? ButtonStyle.Success : ButtonStyle.Secondary),
   );
 }
 
@@ -56,6 +61,11 @@ function buildDisabledButtons() {
       .setCustomId('player_stop')
       .setEmoji(config.emojis.stop)
       .setStyle(ButtonStyle.Danger)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_loop')
+      .setEmoji(config.emojis.loop)
+      .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
   );
 }

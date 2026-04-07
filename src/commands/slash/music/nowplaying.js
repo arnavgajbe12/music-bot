@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildErrorEmbed, buildNowPlayingEmbed } = require('../../../utils/embeds');
-const { buildPlayerButtons } = require('../../../utils/functions');
+const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildNowPlayingV2 } = require('../../../utils/componentBuilder');
+const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
   data: new SlashCommandBuilder().setName('nowplaying').setDescription('Show the currently playing track.'),
@@ -13,9 +14,9 @@ module.exports = {
       return interaction.editReply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
-    const embed = buildNowPlayingEmbed(player.queue.current, player);
-    const row = buildPlayerButtons(player);
+    const settings = getSettings(interaction.guild.id);
+    const payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
 
-    return interaction.editReply({ embeds: [embed], components: [row] });
+    return interaction.editReply(payload);
   },
 };
