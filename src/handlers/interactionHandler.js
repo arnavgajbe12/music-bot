@@ -1,5 +1,5 @@
 const { buildErrorEmbed } = require('../utils/embeds');
-const { buildPlayerButtonsV2 } = require('../utils/componentBuilder');
+const { buildPlayerButtonsV2, buildQueueV2, buildPlayNextConfirmV2 } = require('../utils/componentBuilder');
 const { getSettings } = require('../utils/setupManager');
 
 /**
@@ -68,12 +68,53 @@ module.exports = (client) => {
         return;
       }
 
+      // ── Queue track selection – move to play next ──────────────────────────
+      if (interaction.customId === 'queue_select') {
+        const player = client.manager.players.get(interaction.guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        const trackIndex = parseInt(interaction.values[0], 10);
+        const tracks = player.queue.tracks ?? [];
+
+        if (isNaN(trackIndex) || trackIndex < 0 || trackIndex >= tracks.length) {
+          return interaction.reply({ embeds: [buildErrorEmbed('That track is no longer in the queue.')], ephemeral: true });
+        }
+
+        // Remove from current position and unshift to front
+        const [movedTrack] = tracks.splice(trackIndex, 1);
+        player.queue.unshift(movedTrack);
+
+        // Rebuild the queue panel on the same message (stay on page 1 after move)
+        const updatedTracks = player.queue.tracks ?? [];
+        const queuePayload = buildQueueV2(player.queue.current, updatedTracks, 1);
+        await interaction.update(queuePayload);
+
+        // Send an ephemeral confirmation popup
+        const confirmPayload = buildPlayNextConfirmV2(movedTrack);
+        await interaction.followUp({ ...confirmPayload, ephemeral: true });
+        return;
+      }
+
       return;
     }
 
     // ── Button Interactions ────────────────────────────────────────────────
     if (interaction.isButton()) {
       const { customId, guild, member } = interaction;
+
+      // ── Queue pagination navigation ──────────────────────────────────────
+      if (customId.startsWith('queue_nav:')) {
+        const player = client.manager.players.get(guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+        const page = parseInt(customId.split(':')[1], 10);
+        const tracks = player.queue.tracks ?? [];
+        const payload = buildQueueV2(player.queue.current, tracks, page);
+        return interaction.update(payload);
+      }
 
       const validIds = ['player_previous', 'player_pause', 'player_skip', 'player_stop', 'player_loop'];
       if (!validIds.includes(customId)) return;

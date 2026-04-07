@@ -15,10 +15,20 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   MessageFlags,
 } = require('discord.js');
 const config = require('../../config');
 const { formatDuration, resolvePlatformEmoji, resolveSourceDisplayName } = require('./embeds');
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Maximum length of a Discord select-menu option label/description. */
+const SELECT_OPTION_MAX_LENGTH = 100;
+
+/** Auto-delete delay (ms) for ephemeral "play next" confirmation messages. */
+const PLAY_NEXT_DELETE_DELAY_MS = 15000;
 
 // ─── Button Builders ──────────────────────────────────────────────────────────
 
@@ -323,6 +333,137 @@ function buildAddedPlaylistV2(playlistName, trackCount, artUrl) {
   };
 }
 
+// ─── Queue Component v2 Builder ───────────────────────────────────────────────
+
+/** Number of tracks shown per queue page. */
+const QUEUE_PAGE_SIZE = 5;
+
+/**
+ * Build the Queue Component v2 message payload with optional pagination and
+ * a per-page dropdown that lets users move a track to the front of the queue.
+ *
+ * @param {object} current   - KazagumoTrack (now playing)
+ * @param {object[]} tracks  - Upcoming tracks array
+ * @param {number} page      - Current page (1-based)
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildQueueV2(current, tracks, page = 1) {
+  const totalPages = Math.max(1, Math.ceil(tracks.length / QUEUE_PAGE_SIZE));
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const start = (clampedPage - 1) * QUEUE_PAGE_SIZE;
+  const pageTracks = tracks.slice(start, start + QUEUE_PAGE_SIZE);
+
+  const currentEmoji = resolvePlatformEmoji(current.sourceName);
+  const container = new ContainerBuilder();
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## ${config.emojis.queue} Music Queue — Page ${clampedPage}/${totalPages}\n` +
+        `**Now Playing:** ${currentEmoji} ${current.title} — \`${formatDuration(current.length)}\``,
+    ),
+  );
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // ── Track list ───────────────────────────────────────────────────────────────
+  const trackListText = pageTracks.length
+    ? pageTracks
+        .map((t, i) => {
+          const emoji = resolvePlatformEmoji(t.sourceName);
+          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
+        })
+        .join('\n')
+    : '*No upcoming tracks.*';
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackListText));
+
+  // ── Navigation buttons (only when there are multiple pages) ──────────────────
+  if (totalPages > 1) {
+    container.addSeparatorComponents(new SeparatorBuilder());
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`queue_nav:${clampedPage - 1}`)
+          .setEmoji(config.emojis.previous)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(clampedPage <= 1),
+        new ButtonBuilder()
+          .setCustomId(`queue_nav:${clampedPage + 1}`)
+          .setEmoji(config.emojis.skip)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(clampedPage >= totalPages),
+      ),
+    );
+  }
+
+  // ── Dropdown (tracks on current page) ────────────────────────────────────────
+  if (pageTracks.length > 0) {
+    const options = pageTracks.map((t, i) => {
+      const raw = t.title;
+      const label =
+        raw.length > SELECT_OPTION_MAX_LENGTH ? raw.slice(0, SELECT_OPTION_MAX_LENGTH - 3) + '...' : raw;
+      const rawDesc = `${t.author || 'Unknown'} — ${formatDuration(t.length)}`;
+      const desc =
+        rawDesc.length > SELECT_OPTION_MAX_LENGTH
+          ? rawDesc.slice(0, SELECT_OPTION_MAX_LENGTH - 3) + '...'
+          : rawDesc;
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(label)
+        .setDescription(desc)
+        .setValue(String(start + i));
+    });
+
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('queue_select')
+          .setPlaceholder('Move a track to play next…')
+          .addOptions(options),
+      ),
+    );
+  }
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+/**
+ * Build the "Play Next" confirmation Component v2 message payload.
+ *
+ * @param {object} track - KazagumoTrack that was moved to the front
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildPlayNextConfirmV2(track) {
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
+  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+
+  const container = new ContainerBuilder();
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${config.emojis.skip} Play Next\n` +
+          `### ${track.title}\n` +
+          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+          `▶️ This track will play immediately after the current song.`,
+      ),
+    )
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+
+  container.addSectionComponents(section);
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
 module.exports = {
   buildPlayerButtonsV2,
   buildDisabledButtonsV2,
@@ -332,4 +473,8 @@ module.exports = {
   buildAddedPlaylistV2,
   buildIdleV2,
   buildSetupIdleV2,
+  buildQueueV2,
+  buildPlayNextConfirmV2,
+  QUEUE_PAGE_SIZE,
+  PLAY_NEXT_DELETE_DELAY_MS,
 };
