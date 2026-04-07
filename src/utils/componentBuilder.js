@@ -217,6 +217,7 @@ function buildSetupIdleV2(largeArt = true) {
 /**
  * Build the Now Playing Component v2 message payload WITHOUT control buttons.
  * Used by the /nowplaying command so it doesn't duplicate the interactive controls.
+ * Shows elapsed / total time as [01:15 / 03:45].
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
  * @param {boolean} [largeArt=true] - Show art as large gallery image
@@ -229,6 +230,10 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+
+  const position = player.position || 0;
+  const total = track.length || 0;
+  const progressStr = `[${formatDuration(position)} / ${formatDuration(total)}]`;
 
   const container = new ContainerBuilder();
 
@@ -245,7 +250,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
         `### ${track.title}\n` +
           `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
           `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+          `⏱️ **Progress:** ${progressStr}\n` +
           `👤 **Requested by:** ${requesterTag}`,
       ),
     );
@@ -256,7 +261,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
           `### ${track.title}\n` +
             `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
             `${platformEmoji} **Source:** ${sourceDisplay}\n` +
-            `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+            `⏱️ **Progress:** ${progressStr}\n` +
             `👤 **Requested by:** ${requesterTag}`,
         ),
       )

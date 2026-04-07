@@ -63,6 +63,7 @@ module.exports = {
         if (!nowPlayingMsg) {
           nowPlayingMsg = await channel.send(payload);
           player.data.set('nowPlayingMessageId', nowPlayingMsg.id);
+          player.data.set('nowPlayingMessageChannelId', channel.id);
         }
 
         player.data.set('nowPlayingMessage', nowPlayingMsg);
