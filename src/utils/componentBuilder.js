@@ -193,7 +193,7 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const detailText =
     `## ${track.title}\n` +
     `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-    `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+    `${platformEmoji}: ${sourceDisplay}\n` +
     `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
     `👤 **Requested by:** ${requesterName}`;
 
@@ -616,7 +616,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const detailText =
     `## ${track.title}\n` +
     `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-    `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+    `${platformEmoji}: ${sourceDisplay}\n` +
     `⏱️ **Progress:** ${progressStr}\n` +
     `👤 **Requested by:** ${requesterName}`;
 
@@ -631,6 +631,8 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
     container.addSectionComponents(section);
   }
+
+  container.addSeparatorComponents(new SeparatorBuilder());
 
   return {
     components: [container],
@@ -657,7 +659,7 @@ function buildAddedToQueueV2(track, queueSize) {
         `## ${config.emojis.queue} Added to Queue\n` +
           `### ${track.title}\n` +
           `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+          `${platformEmoji}: ${sourceDisplay}\n` +
           `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
           `📋 **Position:** #${queueSize}`,
       ),
@@ -665,6 +667,7 @@ function buildAddedToQueueV2(track, queueSize) {
     .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
 
   container.addSectionComponents(section);
+  container.addSeparatorComponents(new SeparatorBuilder());
 
   return {
     components: [container],
@@ -694,6 +697,7 @@ function buildAddedPlaylistV2(playlistName, trackCount, artUrl) {
     .setThumbnailAccessory(new ThumbnailBuilder().setURL(imageUrl));
 
   container.addSectionComponents(section);
+  container.addSeparatorComponents(new SeparatorBuilder());
 
   return {
     components: [container],
@@ -817,7 +821,7 @@ function buildPlayNextConfirmV2(track) {
         `## ${config.emojis.skip} Play Next\n` +
           `### ${track.title}\n` +
           `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
-          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+          `${platformEmoji}: ${sourceDisplay}\n` +
           `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
           `▶️ This track will play immediately after the current song.`,
       ),
@@ -825,6 +829,7 @@ function buildPlayNextConfirmV2(track) {
     .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
 
   container.addSectionComponents(section);
+  container.addSeparatorComponents(new SeparatorBuilder());
 
   return {
     components: [container],
