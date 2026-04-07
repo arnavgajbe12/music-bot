@@ -32,6 +32,35 @@ function buildPlayerButtons(player) {
 }
 
 /**
+ * Build disabled player control buttons (used when queue concludes)
+ * @returns {ActionRowBuilder}
+ */
+function buildDisabledButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('player_previous')
+      .setEmoji(config.emojis.previous)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_pause')
+      .setEmoji(config.emojis.play)
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_skip')
+      .setEmoji(config.emojis.skip)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('player_stop')
+      .setEmoji(config.emojis.stop)
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(true),
+  );
+}
+
+/**
  * Check if user is in the same voice channel as the bot
  * @param {import('discord.js').GuildMember} member
  * @param {import('discord.js').Guild} guild
@@ -53,4 +82,4 @@ function checkVoice(member, guild, player) {
   return { ok: true };
 }
 
-module.exports = { buildPlayerButtons, checkVoice };
+module.exports = { buildPlayerButtons, buildDisabledButtons, checkVoice };

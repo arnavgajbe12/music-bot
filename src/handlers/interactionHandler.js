@@ -25,6 +25,23 @@ module.exports = (client) => {
       return;
     }
 
+    // ── String Select Menus ────────────────────────────────────────────────
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === 'help_category') {
+        try {
+          const { buildCategoryEmbed, buildSelectMenu } = require('../commands/slash/general/help');
+          const selected = interaction.values[0];
+          const embed = buildCategoryEmbed(selected);
+          const row = buildSelectMenu(selected);
+          await interaction.update({ embeds: [embed], components: [row] });
+        } catch (error) {
+          console.error('[InteractionHandler] help_category select error:', error);
+          await interaction.reply({ embeds: [buildErrorEmbed('Could not load that category.')], ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
     // ── Button Interactions ────────────────────────────────────────────────
     if (interaction.isButton()) {
       const { customId, guild, member } = interaction;

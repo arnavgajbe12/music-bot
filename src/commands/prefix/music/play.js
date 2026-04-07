@@ -1,6 +1,5 @@
-const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
+const { buildErrorEmbed } = require('../../../utils/embeds');
 const { checkVoice } = require('../../../utils/functions');
-const config = require('../../../../config');
 
 module.exports = {
   name: 'play',
@@ -46,26 +45,21 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed('No results found for that query.')] });
     }
 
+    let replyContent;
     if (result.type === 'PLAYLIST') {
       for (const track of result.tracks) {
         player.queue.add(track);
       }
-      await message.reply({
-        embeds: [
-          buildEmbed(
-            `${config.emojis.success} Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`,
-          ),
-        ],
-      });
+      replyContent = `✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`;
     } else {
       const track = result.tracks[0];
       player.queue.add(track);
-      if (player.playing || player.paused) {
-        await message.reply({
-          embeds: [buildEmbed(`${config.emojis.success} Added **[${track.title}](${track.uri})** to the queue.`)],
-        });
-      }
+      replyContent = `✅ Added **${track.title}** to the queue.`;
     }
+
+    // Send a brief reply, then delete it after 5 s so chat stays clean
+    const reply = await message.reply(replyContent);
+    setTimeout(() => reply.delete().catch(() => {}), 5000);
 
     if (!player.playing && !player.paused) {
       await player.play();

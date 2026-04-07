@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
+const { buildErrorEmbed } = require('../../../utils/embeds');
 const { checkVoice } = require('../../../utils/functions');
-const config = require('../../../../config');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,7 +11,7 @@ module.exports = {
     ),
 
   async run(client, interaction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     const voiceCheck = checkVoice(interaction.member, interaction.guild);
     if (!voiceCheck.ok) {
@@ -54,22 +53,14 @@ module.exports = {
         player.queue.add(track);
       }
       await interaction.editReply({
-        embeds: [
-          buildEmbed(
-            `${config.emojis.success} Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`,
-          ),
-        ],
+        content: `✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`,
       });
     } else {
       const track = result.tracks[0];
       player.queue.add(track);
-      if (player.playing || player.paused) {
-        await interaction.editReply({
-          embeds: [buildEmbed(`${config.emojis.success} Added **[${track.title}](${track.uri})** to the queue.`)],
-        });
-      } else {
-        await interaction.editReply({ embeds: [buildEmbed(`${config.emojis.music} Loading **[${track.title}](${track.uri})**...`)] });
-      }
+      await interaction.editReply({
+        content: `✅ Added **${track.title}** to the queue.`,
+      });
     }
 
     if (!player.playing && !player.paused) {
