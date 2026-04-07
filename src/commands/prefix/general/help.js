@@ -1,5 +1,6 @@
 const { buildCategoryEmbed, buildSelectMenu } = require('../../slash/general/help');
-const config = require('../../../../config');
+
+const HELP_AUTO_DELETE_MS = 60_000; // 60 seconds
 
 module.exports = {
   name: 'help',
@@ -18,7 +19,7 @@ module.exports = {
 
     const reply = await message.reply({ embeds: [embed], components: [row] });
 
-    // Auto-delete after 60 s to keep chat clean
-    setTimeout(() => reply.delete().catch(() => {}), 60000);
+    // Auto-delete to keep chat clean
+    setTimeout(() => reply.delete().catch(() => {}), HELP_AUTO_DELETE_MS);
   },
 };

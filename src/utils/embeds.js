@@ -47,7 +47,7 @@ function buildErrorEmbed(description) {
 }
 
 /**
- * Resolve the platform emoji from a source name
+ * Resolve the platform emoji from a raw source name
  * @param {string} sourceName
  * @returns {string}
  */
@@ -68,7 +68,29 @@ function resolvePlatformEmoji(sourceName) {
 }
 
 /**
- * Build the "Now Playing" embed (stylized Component v2-style layout)
+ * Resolve a human-readable display name for a source platform
+ * @param {string} sourceName
+ * @returns {string}
+ */
+function resolveSourceDisplayName(sourceName) {
+  const displayNames = {
+    spotify: 'Spotify',
+    jiosaavn: 'JioSaavn',
+    'apple music': 'Apple Music',
+    applemusic: 'Apple Music',
+    soundcloud: 'SoundCloud',
+    'amazon music': 'Amazon Music',
+    amazonmusic: 'Amazon Music',
+    deezer: 'Deezer',
+    youtube: 'YouTube',
+    youtubemusic: 'YouTube Music',
+  };
+  const key = (sourceName || '').toLowerCase();
+  return displayNames[key] || (key ? key.charAt(0).toUpperCase() + key.slice(1) : 'Unknown');
+}
+
+/**
+ * Build the "Now Playing" embed (stylized layout)
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
  * @param {string} [platformEmoji] - Emoji representing the source platform
@@ -79,9 +101,7 @@ function buildNowPlayingEmbed(track, player, platformEmoji) {
   const requester = track.requester;
   const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
   const emoji = platformEmoji || config.emojis.music;
-  const sourceName = track.sourceName
-    ? track.sourceName.charAt(0).toUpperCase() + track.sourceName.slice(1)
-    : 'Unknown';
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const loopMode = player.loop && player.loop !== 'none'
     ? ` ${config.emojis.loop} \`${player.loop}\``
     : '';
@@ -94,7 +114,7 @@ function buildNowPlayingEmbed(track, player, platformEmoji) {
     .addFields(
       { name: '🎤 Artist', value: track.author || 'Unknown', inline: true },
       { name: '⏱️ Duration', value: formatDuration(track.length), inline: true },
-      { name: `${emoji} Source`, value: sourceName, inline: true },
+      { name: `${emoji} Source`, value: sourceDisplay, inline: true },
       { name: '👤 Requested By', value: requesterTag, inline: true },
       { name: '🔊 Volume', value: `${player.volume}%`, inline: true },
       { name: '📋 Up Next', value: player.queue.size > 0 ? `${player.queue.size} track(s)` : 'Nothing', inline: true },
@@ -123,6 +143,7 @@ module.exports = {
   buildEmbed,
   buildErrorEmbed,
   resolvePlatformEmoji,
+  resolveSourceDisplayName,
   buildNowPlayingEmbed,
   buildQueueConcludedEmbed,
 };

@@ -47,8 +47,10 @@ module.exports = {
       try {
         const voiceChannelId = player.voiceId;
         if (voiceChannelId) {
+          // Truncate title to stay well within Discord's 500-char VC status limit
+          const titleDisplay = track.title.length > 100 ? track.title.slice(0, 97) + '...' : track.title;
           await client.rest.put(`/channels/${voiceChannelId}/voice-status`, {
-            body: { status: `🎵 Playing: ${track.title}` },
+            body: { status: `🎵 Playing: ${titleDisplay}` },
           });
         }
       } catch {
