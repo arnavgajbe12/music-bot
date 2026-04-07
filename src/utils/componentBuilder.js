@@ -328,17 +328,75 @@ function buildSetupDisabledButtonsV2() {
 }
 
 /**
+ * Build Row 2 of the Setup Channel controls:
+ * Queue (🎛️), Shuffle (🔀), Vol Down (🔉), Vol Up (🔊).
+ * When isQueueView is true, the Queue button is highlighted green.
+ * @param {boolean} [isQueueView=false]
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupRow2V2(isQueueView = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('setup_queue')
+      .setEmoji('🎛️')
+      .setStyle(isQueueView ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('setup_shuffle')
+      .setEmoji(config.emojis.shuffle)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('setup_vol_down')
+      .setEmoji(config.emojis.volumeDown)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('setup_vol_up')
+      .setEmoji(config.emojis.volumeUp)
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+/**
+ * Build Row 2 of the Setup Channel controls in disabled state (for idle panel).
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupRow2DisabledV2() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('setup_queue')
+      .setEmoji('🎛️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('setup_shuffle')
+      .setEmoji(config.emojis.shuffle)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('setup_vol_down')
+      .setEmoji(config.emojis.volumeDown)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('setup_vol_up')
+      .setEmoji(config.emojis.volumeUp)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+  );
+}
+
+/**
  * Build the Setup Channel Now Playing Component v2 panel.
  * This is the permanent panel in the song-request channel.
  *
  * Layout:
  *  - Dynamic accent color (extracted from thumbnail, random on failure)
- *  - Header (medium text): [Emoji] Source Name - Song Title  ← clickable link
+ *  - Header (medium text): Emoji Source Name - [Song Title](URL)
  *  - Large image: track thumbnail
  *  - Body (large text): ## Song Title  (no link)
  *  - Subtext: Artist • Duration
  *  - Separator
- *  - 4 uniform-color buttons: ⏮️ Previous | ⏯️ Pause | ⏭️ Skip | ⏹️ Stop
+ *  - Row 1: ⏮️ Previous | ⏯️ Pause | ⏭️ Skip | ⏹️ Stop
+ *  - Row 2: 🎛️ Queue | 🔀 Shuffle | 🔉 Vol Down | 🔊 Vol Up
  *
  * NOTE: No user pings anywhere.
  *
@@ -355,9 +413,9 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const trackUrl = track.uri || null;
 
-  // Clickable header: [🔴 YouTube Music - Blinding Lights](https://...)
+  // Clickable header: 🔴 YouTube Music - [Blinding Lights](https://...)
   const headerText = trackUrl
-    ? `[${platformEmoji} ${sourceDisplay} - ${track.title}](${trackUrl})`
+    ? `${platformEmoji} ${sourceDisplay} - [${track.title}](${trackUrl})`
     : `${platformEmoji} ${sourceDisplay} - ${track.title}`;
 
   const container = new ContainerBuilder();
@@ -391,6 +449,7 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupButtonsV2(player));
+  container.addActionRowComponents(buildSetupRow2V2(false));
 
   return {
     components: [container],
@@ -423,6 +482,96 @@ function buildSetupIdleV2() {
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupDisabledButtonsV2());
+  container.addActionRowComponents(buildSetupRow2DisabledV2());
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+// ─── Setup Channel Queue Toggle View ──────────────────────────────────────────
+
+/** Number of upcoming tracks shown per page in the setup channel queue view. */
+const SETUP_QUEUE_PAGE_SIZE = 4;
+
+/**
+ * Build the Setup Channel Queue Toggle View.
+ * Replaces the large image with a 5-song list (1 current + 4 upcoming).
+ * The Queue button (Row 2) is highlighted green while in this view.
+ * Navigation buttons (⬆️ / ⬇️) are added above the control rows.
+ *
+ * @param {object} currentTrack - KazagumoTrack (currently playing)
+ * @param {object[]} tracks     - Upcoming tracks array
+ * @param {number} page         - Current page (1-based)
+ * @param {number} accentColor  - Pre-computed accent color (integer)
+ * @param {object} player       - KazagumoPlayer (for control buttons state)
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, player) {
+  const totalPages = Math.max(1, Math.ceil(tracks.length / SETUP_QUEUE_PAGE_SIZE));
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const start = (clampedPage - 1) * SETUP_QUEUE_PAGE_SIZE;
+  const pageTracks = tracks.slice(start, start + SETUP_QUEUE_PAGE_SIZE);
+
+  const container = new ContainerBuilder();
+  const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
+  container.setAccentColor(color);
+
+  // Current track header
+  const currentEmoji = resolvePlatformEmoji(currentTrack.sourceName);
+  const currentArtUrl = currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail;
+  const currentTrackUrl = currentTrack.uri || null;
+  const currentTitle = currentTrackUrl
+    ? `[${currentTrack.title}](${currentTrackUrl})`
+    : currentTrack.title;
+
+  // Section: current track with small thumbnail accessory
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `▶️ **Now Playing**\n${currentEmoji} **${currentTitle}**\n${currentTrack.author || 'Unknown'} • ${formatDuration(currentTrack.length)}`,
+      ),
+    )
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(currentArtUrl));
+  container.addSectionComponents(section);
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Upcoming tracks list
+  const trackListText = pageTracks.length
+    ? pageTracks
+        .map((t, i) => {
+          const emoji = resolvePlatformEmoji(t.sourceName);
+          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
+        })
+        .join('\n')
+    : '*No upcoming tracks.*';
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackListText));
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Navigation row (⬆️ Prev page / ⬇️ Next page)
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`setup_queue_nav:${clampedPage - 1}`)
+        .setEmoji('⬆️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage <= 1),
+      new ButtonBuilder()
+        .setCustomId(`setup_queue_nav:${clampedPage + 1}`)
+        .setEmoji('⬇️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage >= totalPages),
+    ),
+  );
+
+  // Control Row 1 (Previous, Pause, Skip, Stop) — always visible
+  container.addActionRowComponents(buildSetupButtonsV2(player));
+  // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up) — always visible
+  container.addActionRowComponents(buildSetupRow2V2(true));
 
   return {
     components: [container],
@@ -683,6 +832,95 @@ function buildPlayNextConfirmV2(track) {
   };
 }
 
+// ─── Standalone Queue Builder (10 per page) ───────────────────────────────────
+
+/** Number of tracks shown per page in the standalone !queue / /queue command. */
+const QUEUE_STANDALONE_PAGE_SIZE = 10;
+
+/**
+ * Build the standalone Queue Component v2 message payload (10 per page).
+ * Includes navigation buttons and a ❌ Delete button.
+ *
+ * @param {object} current   - KazagumoTrack (now playing)
+ * @param {object[]} tracks  - Upcoming tracks array
+ * @param {number} page      - Current page (1-based)
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildQueueStandaloneV2(current, tracks, page = 1) {
+  const totalPages = Math.max(1, Math.ceil(tracks.length / QUEUE_STANDALONE_PAGE_SIZE));
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const start = (clampedPage - 1) * QUEUE_STANDALONE_PAGE_SIZE;
+  const pageTracks = tracks.slice(start, start + QUEUE_STANDALONE_PAGE_SIZE);
+
+  const currentEmoji = resolvePlatformEmoji(current.sourceName);
+  const container = new ContainerBuilder();
+
+  // Header
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## ${config.emojis.queue} Music Queue — Page ${clampedPage}/${totalPages}\n` +
+        `**Now Playing:** ${currentEmoji} ${current.title} — \`${formatDuration(current.length)}\``,
+    ),
+  );
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Track list
+  const trackListText = pageTracks.length
+    ? pageTracks
+        .map((t, i) => {
+          const emoji = resolvePlatformEmoji(t.sourceName);
+          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
+        })
+        .join('\n')
+    : '*No upcoming tracks.*';
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackListText));
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Navigation + Delete row (always shown)
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`queue_standalone_nav:${clampedPage - 1}`)
+        .setEmoji(config.emojis.previous)
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage <= 1),
+      new ButtonBuilder()
+        .setCustomId(`queue_standalone_nav:${clampedPage + 1}`)
+        .setEmoji(config.emojis.skip)
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage >= totalPages),
+      new ButtonBuilder()
+        .setCustomId('queue_delete')
+        .setEmoji('❌')
+        .setStyle(ButtonStyle.Danger),
+    ),
+  );
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+/**
+ * Build a simple Component v2 confirmation panel (used by join/disconnect commands).
+ * @param {string} text - The confirmation message text
+ * @param {number} [accentColor] - Optional accent color
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildConfirmV2(text, accentColor) {
+  const container = new ContainerBuilder();
+  if (accentColor != null) container.setAccentColor(accentColor);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
 module.exports = {
   buildPlayerButtonsV2,
   buildDisabledButtonsV2,
@@ -696,9 +934,16 @@ module.exports = {
   buildSetupNowPlayingV2,
   buildSetupButtonsV2,
   buildSetupDisabledButtonsV2,
+  buildSetupRow2V2,
+  buildSetupRow2DisabledV2,
+  buildSetupQueueViewV2,
   extractDominantColor,
   buildQueueV2,
+  buildQueueStandaloneV2,
   buildPlayNextConfirmV2,
+  buildConfirmV2,
   QUEUE_PAGE_SIZE,
+  QUEUE_STANDALONE_PAGE_SIZE,
+  SETUP_QUEUE_PAGE_SIZE,
   PLAY_NEXT_DELETE_DELAY_MS,
 };

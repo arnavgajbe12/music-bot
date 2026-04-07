@@ -1,6 +1,5 @@
 const { buildErrorEmbed } = require('../../../utils/embeds');
-const { buildQueueV2 } = require('../../../utils/componentBuilder');
-const { MessageFlags } = require('discord.js');
+const { buildQueueStandaloneV2 } = require('../../../utils/componentBuilder');
 
 module.exports = {
   name: 'queue',
@@ -15,20 +14,33 @@ module.exports = {
     }
 
     const tracks = [...player.queue];
-    const page = Math.max(1, parseInt(args[0]) || 1);
-    const payload = buildQueueV2(player.queue.current, tracks, page);
+    const ITEMS_PER_PAGE = 10;
+    const totalPages = Math.max(1, Math.ceil(tracks.length / ITEMS_PER_PAGE));
 
-    // Send as an ephemeral-style reply (flags: Ephemeral only works with interaction replies,
-    // for prefix commands we delete the triggering message and send a DM-style or timed reply)
-    const reply = await message.reply({
-      ...payload,
-      flags: MessageFlags.IsComponentsV2,
-    });
-
-    // Auto-delete the queue message after 60 seconds to keep chat clean
-    setTimeout(() => reply.delete().catch(() => {}), 60000);
+    // Start on the requested page (or page 1 by default)
+    const requestedPage = Math.max(1, Math.min(parseInt(args[0]) || 1, totalPages));
+    const payload = buildQueueStandaloneV2(player.queue.current, tracks, requestedPage);
 
     // Delete the user's command message immediately to keep chat clean
     message.delete().catch(() => {});
+
+    const reply = await message.channel.send(payload);
+
+    // Auto-delete after 15 seconds of no interaction.
+    // The actual button responses (nav, delete) are handled by the global interactionHandler.
+    // This passive collector only manages the idle timer.
+    let idleTimer = setTimeout(() => reply.delete().catch(() => {}), 15000);
+
+    const collector = reply.createMessageComponentCollector({ time: 300000 });
+
+    collector.on('collect', () => {
+      // Reset idle timer on any button press
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => reply.delete().catch(() => {}), 15000);
+    });
+
+    collector.on('end', () => {
+      clearTimeout(idleTimer);
+    });
   },
 };

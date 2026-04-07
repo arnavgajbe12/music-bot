@@ -23,6 +23,9 @@ module.exports = {
               // Extract dominant color from the thumbnail asynchronously
               const artUrl = track.thumbnail || track.artworkUrl || null;
               const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+              // Cache accent color and reset queue view when a new track starts
+              player.data.set('accentColor', accentColor);
+              player.data.set('setupQueueView', false);
               const payload = buildSetupNowPlayingV2(track, player, accentColor);
               await setupMsg.edit(payload);
               player.data.set('nowPlayingMessage', setupMsg);
