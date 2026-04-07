@@ -60,7 +60,7 @@ module.exports = {
       if (!wasIdle) {
         const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
-        const msg = await interaction.editReply(payload);
+        await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
         return;
       }
