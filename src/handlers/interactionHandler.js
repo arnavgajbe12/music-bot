@@ -275,12 +275,14 @@ module.exports = (client) => {
               // No previous track — restart current from 0:00
               await player.shoukaku.seekTo(0);
             } else {
-              // Get and remove the most recent previous track from history
-              const prevTrack = player.getPrevious
-                ? player.getPrevious(true)
-                : (Array.isArray(player.queue.previous)
-                    ? player.queue.previous.shift()
-                    : player.queue.previous);
+              // Use Kazagumo's getPrevious(true) to remove and return the most recent history entry.
+              // Fall back to manual array shift for compatibility.
+              let prevTrack;
+              if (typeof player.getPrevious === 'function') {
+                prevTrack = player.getPrevious(true);
+              } else if (Array.isArray(player.queue.previous)) {
+                prevTrack = player.queue.previous.shift();
+              }
 
               if (prevTrack) {
                 // replaceCurrent: false → current song is unshifted back to position 0
@@ -291,7 +293,7 @@ module.exports = (client) => {
             break;
           }
           case 'player_pause': {
-            player.pause(!player.paused);
+            await player.pause(!player.paused);
             break;
           }
           case 'player_skip': {

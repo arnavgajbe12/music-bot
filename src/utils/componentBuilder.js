@@ -19,6 +19,7 @@ const {
   StringSelectMenuOptionBuilder,
   MessageFlags,
 } = require('discord.js');
+const Vibrant = require('node-vibrant');
 const config = require('../../config');
 const { formatDuration, resolvePlatformEmoji, resolveSourceDisplayName } = require('./embeds');
 
@@ -41,7 +42,6 @@ const PLAY_NEXT_DELETE_DELAY_MS = 15000;
 async function extractDominantColor(imageUrl) {
   try {
     if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error('invalid url');
-    const Vibrant = require('node-vibrant');
     const palette = await Vibrant.from(imageUrl).getPalette();
     const swatch =
       palette.Vibrant ||
