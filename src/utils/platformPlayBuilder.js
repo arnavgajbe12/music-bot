@@ -42,6 +42,23 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           shardId: interaction.guild.shardId ?? 0,
         });
         player.data.set('textChannel', interaction.channel.id);
+      } else {
+        // Update text channel if the user is issuing the command from a different channel
+        const prevChannelId = player.data.get('textChannel');
+        if (prevChannelId && prevChannelId !== interaction.channel.id) {
+          player.data.set('textChannel', interaction.channel.id);
+          const oldMsgId = player.data.get('nowPlayingMessageId');
+          const oldChannelId = player.data.get('nowPlayingMessageChannelId');
+          if (oldMsgId && oldChannelId) {
+            const oldChannel = client.channels.cache.get(oldChannelId);
+            if (oldChannel?.isTextBased()) {
+              oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
+            }
+            player.data.delete('nowPlayingMessage');
+            player.data.delete('nowPlayingMessageId');
+            player.data.delete('nowPlayingMessageChannelId');
+          }
+        }
       }
 
       let result;
@@ -63,7 +80,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
           await interaction.editReply(payload);
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           return;
         }
         await interaction.deleteReply().catch(() => {});
@@ -74,7 +91,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           const queueSize = player.queue.size;
           const payload = buildAddedToQueueV2(track, queueSize);
           await interaction.editReply(payload);
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           return;
         }
         await interaction.deleteReply().catch(() => {});

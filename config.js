@@ -43,7 +43,7 @@ module.exports = {
       amazonmusic: '📦',
       deezer: '🎶',
       youtube: '▶️',
-      youtubemusic: '▶️',
+      youtubemusic: '🔴',
     },
   },
 

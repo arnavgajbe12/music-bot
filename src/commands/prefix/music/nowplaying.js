@@ -1,5 +1,6 @@
-const { buildErrorEmbed, buildNowPlayingEmbed } = require('../../../utils/embeds');
-const { buildPlayerButtons } = require('../../../utils/functions');
+const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildNowPlayingV2NoButtons } = require('../../../utils/componentBuilder');
+const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
   name: 'nowplaying',
@@ -13,9 +14,14 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
-    const embed = buildNowPlayingEmbed(player.queue.current, player);
-    const row = buildPlayerButtons(player);
+    const settings = getSettings(message.guild.id);
+    const payload = buildNowPlayingV2NoButtons(player.queue.current, player, settings.largeArt);
 
-    return message.reply({ embeds: [embed], components: [row] });
+    const msg = await message.reply(payload);
+
+    // Store the message reference so playerEnd/playerStart can delete it
+    const existingMsgs = player.data.get('nowPlayingCmdMessages') || [];
+    existingMsgs.push(msg);
+    player.data.set('nowPlayingCmdMessages', existingMsgs);
   },
 };
