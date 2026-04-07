@@ -88,7 +88,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
         const track = result.tracks[0];
         player.queue.add(track);
         if (!wasIdle) {
-          const queueSize = player.queue.size;
+          const queueSize = player.queue.size ?? player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
           await interaction.editReply(payload);
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
@@ -102,4 +102,106 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
   };
 }
 
-module.exports = { buildPlatformPlayCommand };
+/**
+ * Build a platform-specific prefix play command.
+ * @param {string} name - Command name (e.g. 'yt')
+ * @param {string[]} aliases - Command aliases
+ * @param {string} description - Human-readable description
+ * @param {string} searchPrefix - Kazagumo/LavaSrc search prefix (e.g. 'ytsearch:')
+ * @param {string} platformLabel - Display label (e.g. 'YouTube')
+ */
+function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, platformLabel) {
+  return {
+    name,
+    aliases,
+    description,
+    usage: `<song name>`,
+
+    async run(client, message, args) {
+      if (!args.length) {
+        return message.reply({ embeds: [buildErrorEmbed(`Please provide a song name to search on ${platformLabel}.`)] });
+      }
+
+      const voiceCheck = checkVoice(message.member, message.guild);
+      if (!voiceCheck.ok) {
+        return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      }
+
+      const rawQuery = args.join(' ');
+      const isUrl = /^https?:\/\//i.test(rawQuery);
+      const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
+      const voiceChannel = message.member.voice.channel;
+
+      await message.channel.sendTyping();
+
+      let player = client.manager.players.get(message.guild.id);
+      if (!player) {
+        player = await client.manager.createPlayer({
+          guildId: message.guild.id,
+          voiceId: voiceChannel.id,
+          textId: message.channel.id,
+          deaf: true,
+          shardId: message.guild.shardId ?? 0,
+        });
+        player.data.set('textChannel', message.channel.id);
+      } else {
+        const prevChannelId = player.data.get('textChannel');
+        if (prevChannelId && prevChannelId !== message.channel.id) {
+          player.data.set('textChannel', message.channel.id);
+          const oldMsgId = player.data.get('nowPlayingMessageId');
+          const oldChannelId = player.data.get('nowPlayingMessageChannelId');
+          if (oldMsgId && oldChannelId) {
+            const oldChannel = client.channels.cache.get(oldChannelId);
+            if (oldChannel?.isTextBased()) {
+              oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
+            }
+            player.data.delete('nowPlayingMessage');
+            player.data.delete('nowPlayingMessageId');
+            player.data.delete('nowPlayingMessageChannelId');
+          }
+        }
+      }
+
+      let result;
+      try {
+        result = await client.manager.search(query, { requester: message.author });
+      } catch (error) {
+        console.error(`[prefix ${name}] Search error:`, error);
+        return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      }
+
+      if (!result || !result.tracks.length) {
+        return message.reply({ embeds: [buildErrorEmbed(`No results found on ${platformLabel}.`)] });
+      }
+
+      const wasIdle = !player.playing && !player.paused;
+
+      if (result.type === 'PLAYLIST') {
+        for (const track of result.tracks) player.queue.add(track);
+        if (!wasIdle) {
+          const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
+          const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
+          const reply = await message.reply(payload);
+          setTimeout(() => reply.delete().catch(() => {}), 15000);
+          if (!player.playing && !player.paused) await player.play();
+          return;
+        }
+      } else {
+        const track = result.tracks[0];
+        player.queue.add(track);
+        if (!wasIdle) {
+          const queueSize = player.queue.size ?? player.queue.length;
+          const payload = buildAddedToQueueV2(track, queueSize);
+          const reply = await message.reply(payload);
+          setTimeout(() => reply.delete().catch(() => {}), 15000);
+          if (!player.playing && !player.paused) await player.play();
+          return;
+        }
+      }
+
+      if (wasIdle) await player.play();
+    },
+  };
+}
+
+module.exports = { buildPlatformPlayCommand, buildPlatformPrefixCommand };

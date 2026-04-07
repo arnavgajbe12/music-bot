@@ -2,6 +2,38 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config');
 
 /**
+ * Search for tracks with a ytmsearch → ytsearch → scsearch fallback chain.
+ * For direct URLs the query is used as-is (no prefix).
+ * @param {object} manager - Kazagumo manager instance
+ * @param {string} rawQuery - The raw user query
+ * @param {object} requester - Discord user requesting the track
+ * @returns {Promise<object|null>} Kazagumo search result, or null if nothing found
+ */
+async function searchWithFallback(manager, rawQuery, requester) {
+  const isUrl = /^https?:\/\//i.test(rawQuery);
+  if (isUrl) {
+    try {
+      const result = await manager.search(rawQuery, { requester });
+      if (result && result.tracks && result.tracks.length > 0) return result;
+    } catch {
+      // fall through
+    }
+    return null;
+  }
+
+  const engines = ['ytmsearch:', 'ytsearch:', 'scsearch:'];
+  for (const engine of engines) {
+    try {
+      const result = await manager.search(`${engine}${rawQuery}`, { requester });
+      if (result && result.tracks && result.tracks.length > 0) return result;
+    } catch {
+      // try next engine
+    }
+  }
+  return null;
+}
+
+/**
  * Build the music player control buttons (includes Loop button)
  * @param {object} player - KazagumoPlayer
  * @returns {ActionRowBuilder}
@@ -92,4 +124,4 @@ function checkVoice(member, guild, player) {
   return { ok: true };
 }
 
-module.exports = { buildPlayerButtons, buildDisabledButtons, checkVoice };
+module.exports = { buildPlayerButtons, buildDisabledButtons, checkVoice, searchWithFallback };

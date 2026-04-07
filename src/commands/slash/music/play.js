@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
-const { checkVoice } = require('../../../utils/functions');
+const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
@@ -21,11 +21,6 @@ module.exports = {
     }
 
     const rawQuery = interaction.options.getString('query');
-    // Use the guild's stored playback source, or fall back to YouTube Music
-    const settings = getSettings(interaction.guild.id);
-    const searchPrefix = settings.playbackSource || 'ytmsearch:';
-    const isUrl = /^https?:\/\//i.test(rawQuery);
-    const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
     const voiceChannel = interaction.member.voice.channel;
 
     let player = client.manager.players.get(interaction.guild.id);
@@ -58,11 +53,28 @@ module.exports = {
       }
     }
 
+    // Use per-guild playback source if set, otherwise use the ytmsearch → ytsearch → scsearch fallback
+    const settings = getSettings(interaction.guild.id);
     let result;
     try {
-      result = await client.manager.search(query, { requester: interaction.user });
+      if (settings.playbackSource) {
+        const isUrl = /^https?:\/\//i.test(rawQuery);
+        const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
+        result = await client.manager.search(query, { requester: interaction.user });
+        // If no tracks found with configured source, fall back to the default chain
+        if (!result || !result.tracks.length) {
+          result = await searchWithFallback(client.manager, rawQuery, interaction.user);
+        }
+      } else {
+        result = await searchWithFallback(client.manager, rawQuery, interaction.user);
+      }
     } catch {
-      return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      // If the configured source throws, try the fallback chain
+      try {
+        result = await searchWithFallback(client.manager, rawQuery, interaction.user);
+      } catch {
+        return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      }
     }
 
     if (!result || !result.tracks.length) {
@@ -88,7 +100,7 @@ module.exports = {
       player.queue.add(track);
       if (!wasIdle) {
         // Song added to an already-running queue – show "Added to Queue" Component v2
-        const queueSize = player.queue.size;
+        const queueSize = player.queue.size ?? player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
