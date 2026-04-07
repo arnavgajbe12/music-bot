@@ -73,6 +73,8 @@ const DEFAULTS = {
   largeArt: true,
   autoplay: false,
   mode247: false,
+  metadataSource: 'youtubemusic',
+  playbackSource: 'ytmsearch:',
 };
 
 /**

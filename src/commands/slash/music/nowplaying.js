@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('../../../utils/embeds');
-const { buildNowPlayingV2 } = require('../../../utils/componentBuilder');
+const { buildNowPlayingV2NoButtons } = require('../../../utils/componentBuilder');
 const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
@@ -15,8 +15,13 @@ module.exports = {
     }
 
     const settings = getSettings(interaction.guild.id);
-    const payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
+    const payload = buildNowPlayingV2NoButtons(player.queue.current, player, settings.largeArt);
 
-    return interaction.editReply(payload);
+    const msg = await interaction.editReply(payload);
+
+    // Store the message reference on the player so playerEnd/playerStart can delete it
+    const existingMsgs = player.data.get('nowPlayingCmdMessages') || [];
+    existingMsgs.push(msg);
+    player.data.set('nowPlayingCmdMessages', existingMsgs);
   },
 };

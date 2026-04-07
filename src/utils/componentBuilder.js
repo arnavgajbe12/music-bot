@@ -204,10 +204,132 @@ function buildSetupIdleV2(largeArt = true) {
   return buildIdleV2(config.images.defaultThumbnail, largeArt);
 }
 
+/**
+ * Build the Now Playing Component v2 message payload WITHOUT control buttons.
+ * Used by the /nowplaying command so it doesn't duplicate the interactive controls.
+ * @param {object} track - KazagumoTrack
+ * @param {object} player - KazagumoPlayer
+ * @param {boolean} [largeArt=true] - Show art as large gallery image
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
+  const requester = track.requester;
+  const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
+  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+
+  const container = new ContainerBuilder();
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${config.emojis.music} Now Playing${loopMode}`),
+  );
+
+  if (largeArt) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${track.title}\n` +
+          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+          `👤 **Requested by:** ${requesterTag}`,
+      ),
+    );
+  } else {
+    const section = new SectionBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `### ${track.title}\n` +
+            `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+            `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+            `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+            `👤 **Requested by:** ${requesterTag}`,
+        ),
+      )
+      .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+    container.addSectionComponents(section);
+  }
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+/**
+ * Build the "Added to Queue" Component v2 message payload (small thumbnail).
+ * @param {object} track - KazagumoTrack
+ * @param {number} queueSize - Number of tracks in queue after adding
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildAddedToQueueV2(track, queueSize) {
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
+  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+
+  const container = new ContainerBuilder();
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${config.emojis.queue} Added to Queue\n` +
+          `### ${track.title}\n` +
+          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+          `${platformEmoji} **Source:** ${sourceDisplay}\n` +
+          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+          `📋 **Position:** #${queueSize}`,
+      ),
+    )
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+
+  container.addSectionComponents(section);
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+/**
+ * Build the "Added Playlist to Queue" Component v2 message payload (small thumbnail).
+ * @param {string} playlistName - Playlist name
+ * @param {number} trackCount - Number of tracks added
+ * @param {string} [artUrl] - Thumbnail URL
+ * @returns {{ components: ContainerBuilder[], flags: number }}
+ */
+function buildAddedPlaylistV2(playlistName, trackCount, artUrl) {
+  const imageUrl = artUrl || config.images.defaultThumbnail;
+  const container = new ContainerBuilder();
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${config.emojis.queue} Playlist Added to Queue\n` +
+          `### ${playlistName}\n` +
+          `📋 **Tracks:** ${trackCount} song${trackCount !== 1 ? 's' : ''} added`,
+      ),
+    )
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(imageUrl));
+
+  container.addSectionComponents(section);
+
+  return {
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
 module.exports = {
   buildPlayerButtonsV2,
   buildDisabledButtonsV2,
   buildNowPlayingV2,
+  buildNowPlayingV2NoButtons,
+  buildAddedToQueueV2,
+  buildAddedPlaylistV2,
   buildIdleV2,
   buildSetupIdleV2,
 };

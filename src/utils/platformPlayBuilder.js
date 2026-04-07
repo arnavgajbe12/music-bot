@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildEmbed, buildErrorEmbed } = require('./embeds');
+const { buildErrorEmbed } = require('./embeds');
+const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('./componentBuilder');
 const { checkVoice } = require('./functions');
 
 /**
@@ -54,20 +55,32 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
         return interaction.editReply({ embeds: [buildErrorEmbed(`No results found on ${platformLabel}.`)] });
       }
 
+      const wasIdle = !player.playing && !player.paused;
+
       if (result.type === 'PLAYLIST') {
         for (const track of result.tracks) player.queue.add(track);
-        await interaction.editReply({
-          embeds: [buildEmbed(`✅ Added **${result.tracks.length}** tracks from **${result.playlistName}** to the queue.`)],
-        });
+        if (!wasIdle) {
+          const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
+          const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
+          await interaction.editReply(payload);
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+          return;
+        }
+        await interaction.deleteReply().catch(() => {});
       } else {
         const track = result.tracks[0];
         player.queue.add(track);
-        await interaction.editReply({
-          embeds: [buildEmbed(`✅ Added **${track.title}** to the queue via ${platformLabel}.`)],
-        });
+        if (!wasIdle) {
+          const queueSize = player.queue.size;
+          const payload = buildAddedToQueueV2(track, queueSize);
+          await interaction.editReply(payload);
+          setTimeout(() => interaction.deleteReply().catch(() => {}), 12000);
+          return;
+        }
+        await interaction.deleteReply().catch(() => {});
       }
 
-      if (!player.playing && !player.paused) await player.play();
+      if (wasIdle) await player.play();
     },
   };
 }

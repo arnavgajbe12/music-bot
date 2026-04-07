@@ -49,6 +49,7 @@ const CATEGORIES = {
       { name: 'setup channel', desc: 'Set a dedicated song request channel with a permanent control panel', usage: '/setup channel <#channel>' },
       { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '/setup remove' },
       { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '/largeart <on|off>' },
+      { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '/source' },
     ],
   },
   dj: {

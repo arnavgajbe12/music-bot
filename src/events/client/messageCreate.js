@@ -1,6 +1,6 @@
 const config = require('../../../config');
 const { buildErrorEmbed } = require('../../utils/embeds');
-const { getSetup } = require('../../utils/setupManager');
+const { getSetup, getSettings } = require('../../utils/setupManager');
 
 // Map short platform prefixes to Kazagumo/LavaSrc search prefixes
 const PLATFORM_PREFIXES = {
@@ -43,8 +43,10 @@ module.exports = {
       } else if (/^https?:\/\//i.test(content)) {
         query = content;
       } else {
-        // Default platform search
-        query = `${config.player.defaultSearchPlatform}:${content}`;
+        // Use the guild's stored playback source, or fall back to config default
+        const guildSettings = getSettings(message.guild.id);
+        const searchPrefix = guildSettings.playbackSource || `${config.player.defaultSearchPlatform}:`;
+        query = `${searchPrefix}${content}`;
       }
 
       let player = client.manager.players.get(message.guild.id);
