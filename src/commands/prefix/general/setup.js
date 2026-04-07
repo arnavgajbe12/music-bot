@@ -1,7 +1,7 @@
 const { PermissionFlagsBits } = require('discord.js');
 const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
 const { buildSetupIdleV2 } = require('../../../utils/componentBuilder');
-const { saveSetup, removeSetup, getSettings } = require('../../../utils/setupManager');
+const { saveSetup, removeSetup } = require('../../../utils/setupManager');
 
 module.exports = {
   name: 'setup',
@@ -33,8 +33,7 @@ module.exports = {
       });
     }
 
-    const settings = getSettings(message.guild.id);
-    const payload = buildSetupIdleV2(settings.largeArt);
+    const payload = buildSetupIdleV2();
 
     let panelMsg;
     try {

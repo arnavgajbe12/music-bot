@@ -1,4 +1,4 @@
-const { buildNowPlayingV2 } = require('../../utils/componentBuilder');
+const { buildNowPlayingV2, buildSetupNowPlayingV2, extractDominantColor } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
 
 module.exports = {
@@ -12,9 +12,6 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
-    // Build the Component v2 Now Playing payload
-    const payload = buildNowPlayingV2(track, player, settings.largeArt);
-
     // ── Setup channel panel edit ─────────────────────────────────────────────
     if (setupInfo) {
       try {
@@ -23,6 +20,10 @@ module.exports = {
           try {
             const setupMsg = await setupChannel.messages.fetch(setupInfo.messageId);
             if (setupMsg?.editable) {
+              // Extract dominant color from the thumbnail asynchronously
+              const artUrl = track.thumbnail || track.artworkUrl || null;
+              const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+              const payload = buildSetupNowPlayingV2(track, player, accentColor);
               await setupMsg.edit(payload);
               player.data.set('nowPlayingMessage', setupMsg);
               player.data.set('nowPlayingMessageId', setupMsg.id);
@@ -43,6 +44,9 @@ module.exports = {
 
       const channel = client.channels.cache.get(channelId);
       if (!channel?.isTextBased()) return;
+
+      // Build standard now-playing payload
+      const payload = buildNowPlayingV2(track, player, settings.largeArt);
 
       try {
         const existingMsgId = player.data.get('nowPlayingMessageId');

@@ -1,5 +1,6 @@
 const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildQueueV2 } = require('../../../utils/componentBuilder');
+const { MessageFlags } = require('discord.js');
 
 module.exports = {
   name: 'queue',
@@ -17,6 +18,17 @@ module.exports = {
     const page = Math.max(1, parseInt(args[0]) || 1);
     const payload = buildQueueV2(player.queue.current, tracks, page);
 
-    return message.reply(payload);
+    // Send as an ephemeral-style reply (flags: Ephemeral only works with interaction replies,
+    // for prefix commands we delete the triggering message and send a DM-style or timed reply)
+    const reply = await message.reply({
+      ...payload,
+      flags: MessageFlags.IsComponentsV2,
+    });
+
+    // Auto-delete the queue message after 60 seconds to keep chat clean
+    setTimeout(() => reply.delete().catch(() => {}), 60000);
+
+    // Delete the user's command message immediately to keep chat clean
+    message.delete().catch(() => {});
   },
 };
