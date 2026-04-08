@@ -192,10 +192,10 @@ function buildNowPlayingV2(track, player, largeArt = true) {
 
   const detailText =
     `## ${track.title}\n` +
-    `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+    `🎤  ${track.author || 'Unknown'}\n` +
     `${platformEmoji}: ${sourceDisplay}\n` +
-    `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
-    `👤 **Requested by:** ${requesterName}`;
+    `⏱️  ${formatDuration(track.length)}\n` +
+    `👤  ${requesterName}`;
 
   if (largeArt) {
     // Large album art as gallery
@@ -689,10 +689,10 @@ function buildAddedToQueueV2(track, queueSize) {
       new TextDisplayBuilder().setContent(
         `## ${config.emojis.queue} Added to Queue\n` +
           `### ${track.title}\n` +
-          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+          `🎤  ${track.author || 'Unknown'}\n` +
           `${platformEmoji}: ${sourceDisplay}\n` +
-          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
-          `📋 **Position:** #${queueSize}`,
+          `⏱️  ${formatDuration(track.length)}\n` +
+          `📋  #${queueSize}`,
       ),
     )
     .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
@@ -851,9 +851,9 @@ function buildPlayNextConfirmV2(track) {
       new TextDisplayBuilder().setContent(
         `## ${config.emojis.skip} Play Next\n` +
           `### ${track.title}\n` +
-          `🎤 **Artist:** ${track.author || 'Unknown'}\n` +
+          `🎤  ${track.author || 'Unknown'}\n` +
           `${platformEmoji}: ${sourceDisplay}\n` +
-          `⏱️ **Duration:** ${formatDuration(track.length)}\n` +
+          `⏱️  ${formatDuration(track.length)}\n` +
           `▶️ This track will play immediately after the current song.`,
       ),
     )
