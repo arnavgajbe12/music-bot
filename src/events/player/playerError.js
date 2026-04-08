@@ -1,4 +1,5 @@
 const { buildErrorEmbed } = require('../../utils/embeds');
+const { logToWebhook } = require('../../utils/webhookLogger');
 
 module.exports = {
   /**
@@ -9,6 +10,17 @@ module.exports = {
    */
   async run(client, player, track, error) {
     console.error(`[playerError] Error playing "${track?.title}":`, error);
+
+    await logToWebhook({
+      title: '🚨 Player Error',
+      color: 0xed4245,
+      fields: [
+        { name: 'Guild ID', value: player?.guildId || 'N/A', inline: true },
+        { name: 'Track', value: track?.title ? `${track.title} — ${track.author || 'Unknown'}` : 'N/A', inline: false },
+        { name: 'Error', value: String(error?.message || error) },
+        { name: 'Stack', value: (error?.stack || 'N/A').slice(0, 900) },
+      ],
+    });
 
     const channelId = player.data.get('textChannel');
     if (!channelId) return;

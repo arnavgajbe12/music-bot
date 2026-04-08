@@ -20,7 +20,7 @@ module.exports = {
     }
 
     player.queue.clear();
-    await player.destroy();
+    await player.destroy().catch(() => {});
 
     return message.reply({
       embeds: [buildEmbed(`${config.emojis.stop} Stopped the music and cleared the queue.`)],

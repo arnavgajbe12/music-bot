@@ -1,9 +1,11 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config');
+const { logToWebhook } = require('./webhookLogger');
 
 /**
  * Search for tracks with a ytmsearch → ytsearch → scsearch fallback chain.
  * For direct URLs the query is used as-is (no prefix).
+ * Verbose console + webhook logging is included to help diagnose search failures.
  * @param {object} manager - Kazagumo manager instance
  * @param {string} rawQuery - The raw user query
  * @param {object} requester - Discord user requesting the track
@@ -11,25 +13,61 @@ const config = require('../../config');
  */
 async function searchWithFallback(manager, rawQuery, requester) {
   const isUrl = /^https?:\/\//i.test(rawQuery);
+
   if (isUrl) {
+    console.log(`[searchWithFallback] URL query detected: "${rawQuery}"`);
     try {
       const result = await manager.search(rawQuery, { requester });
+      console.log(
+        `[searchWithFallback] URL result → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
+      );
       if (result && result.tracks && result.tracks.length > 0) return result;
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error(`[searchWithFallback] URL search threw:`, err?.message || err);
     }
+    console.warn(`[searchWithFallback] URL search returned no tracks for: "${rawQuery}"`);
     return null;
   }
 
   const engines = ['ytmsearch:', 'ytsearch:', 'scsearch:'];
   for (const engine of engines) {
+    const queryStr = `${engine}${rawQuery}`;
     try {
-      const result = await manager.search(`${engine}${rawQuery}`, { requester });
-      if (result && result.tracks && result.tracks.length > 0) return result;
-    } catch {
-      // try next engine
+      console.log(`[searchWithFallback] Trying engine "${engine}" → "${queryStr}"`);
+      const result = await manager.search(queryStr, { requester });
+      console.log(
+        `[searchWithFallback] Result for "${engine}" → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
+      );
+      if (result && result.tracks && result.tracks.length > 0) {
+        console.log(`[searchWithFallback] ✅ Found ${result.tracks.length} track(s) via "${engine}"`);
+        return result;
+      }
+    } catch (err) {
+      console.error(`[searchWithFallback] Engine "${engine}" threw:`, err?.message || err);
+      // Log failures to webhook so we can diagnose remote Lavalink issues
+      await logToWebhook({
+        title: '⚠️ Search Engine Exception',
+        color: 0xffa500,
+        fields: [
+          { name: 'Engine', value: engine, inline: true },
+          { name: 'Query', value: rawQuery, inline: true },
+          { name: 'Error', value: String(err?.message || err) },
+        ],
+      }).catch(() => {});
     }
   }
+
+  console.warn(`[searchWithFallback] ❌ All engines exhausted – no results for: "${rawQuery}"`);
+  await logToWebhook({
+    title: '❌ Search – No Results from Any Engine',
+    color: 0xed4245,
+    fields: [
+      { name: 'Query', value: rawQuery },
+      { name: 'Engines Tried', value: engines.join(', ') },
+      { name: 'Requester', value: requester?.tag || requester?.username || String(requester?.id) || 'Unknown' },
+    ],
+  }).catch(() => {});
+
   return null;
 }
 

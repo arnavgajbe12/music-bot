@@ -2,6 +2,7 @@ const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
 const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
+const { logToWebhook } = require('../../../utils/webhookLogger');
 
 module.exports = {
   name: 'play',
@@ -29,6 +30,7 @@ module.exports = {
     // If a player exists but the bot was manually disconnected from VC, destroy it so we can rejoin
     const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
+      console.log(`[prefix play] Stale player detected in guild "${message.guild.id}" — destroying before rejoin.`);
       await player.destroy().catch(() => {});
       player = null;
     }
@@ -69,26 +71,57 @@ module.exports = {
       if (settings.playbackSource) {
         const isUrl = /^https?:\/\//i.test(rawQuery);
         const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
+        console.log(`[prefix play] Searching with guild source "${settings.playbackSource}" → query: "${query}"`);
         result = await client.manager.search(query, { requester: message.author });
+        console.log(`[prefix play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
         // If no tracks found with configured source, fall back to the default chain
         if (!result || !result.tracks.length) {
+          console.log(`[prefix play] Primary source returned no tracks, trying fallback chain...`);
           result = await searchWithFallback(client.manager, rawQuery, message.author);
         }
       } else {
+        console.log(`[prefix play] No guild source configured, using fallback chain for: "${rawQuery}"`);
         result = await searchWithFallback(client.manager, rawQuery, message.author);
       }
-    } catch {
+    } catch (err) {
+      console.error('[prefix play] Search threw an exception:', err);
+      logToWebhook({
+        title: '🚨 !play Search Exception',
+        color: 0xed4245,
+        fields: [
+          { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
+          { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+          { name: 'Query', value: rawQuery },
+          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
+        ],
+      }).catch(() => {});
       try {
         result = await searchWithFallback(client.manager, rawQuery, message.author);
-      } catch (err) {
-        console.error('[prefix play] Search error:', err);
+      } catch (err2) {
+        console.error('[prefix play] Fallback search also threw:', err2);
         return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
       }
     }
 
     if (!result || !result.tracks.length) {
+      console.warn(`[prefix play] ❌ No results for query: "${rawQuery}" in guild "${message.guild.id}"`);
+      logToWebhook({
+        title: '❌ !play – No Results',
+        color: 0xed4245,
+        fields: [
+          { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
+          { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+          { name: 'Query', value: rawQuery },
+          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Result Type', value: result?.type || 'null/undefined' },
+          { name: 'Track Count', value: String(result?.tracks?.length ?? 0) },
+        ],
+      }).catch(() => {});
       return message.reply({ embeds: [buildErrorEmbed('No results found for that query.')] });
     }
+
+    console.log(`[prefix play] ✅ Found result: type=${result.type}, tracks=${result.tracks.length} in guild "${message.guild.id}"`);
 
     const wasIdle = !player.playing && !player.paused;
 

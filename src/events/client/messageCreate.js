@@ -1,6 +1,7 @@
 const config = require('../../../config');
 const { buildErrorEmbed } = require('../../utils/embeds');
 const { getSetup, getSettings } = require('../../utils/setupManager');
+const { logToWebhook } = require('../../utils/webhookLogger');
 
 // Map short platform prefixes to Kazagumo/LavaSrc search prefixes
 const PLATFORM_PREFIXES = {
@@ -71,16 +72,40 @@ module.exports = {
 
       let result;
       try {
+        console.log(`[messageCreate/setup] Searching: "${query}" for guild "${message.guild.id}"`);
         result = await client.manager.search(query, { requester: message.author });
-      } catch {
-        const err = await message.channel.send({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
-        setTimeout(() => err.delete().catch(() => {}), 5000);
+        console.log(`[messageCreate/setup] Result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
+      } catch (err) {
+        console.error(`[messageCreate/setup] Search threw:`, err);
+        logToWebhook({
+          title: '🚨 Setup Channel Search Exception',
+          color: 0xed4245,
+          fields: [
+            { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
+            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+            { name: 'Query', value: query },
+            { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
+          ],
+        }).catch(() => {});
+        const err2 = await message.channel.send({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+        setTimeout(() => err2.delete().catch(() => {}), 5000);
         return;
       }
 
       if (!result || !result.tracks.length) {
-        const err = await message.channel.send({ embeds: [buildErrorEmbed('No results found.')] });
-        setTimeout(() => err.delete().catch(() => {}), 5000);
+        console.warn(`[messageCreate/setup] No results for: "${query}"`);
+        logToWebhook({
+          title: '❌ Setup Channel – No Results',
+          color: 0xed4245,
+          fields: [
+            { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
+            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+            { name: 'Query', value: query },
+            { name: 'Result Type', value: result?.type || 'null/undefined' },
+          ],
+        }).catch(() => {});
+        const err2 = await message.channel.send({ embeds: [buildErrorEmbed('No results found.')] });
+        setTimeout(() => err2.delete().catch(() => {}), 5000);
         return;
       }
 

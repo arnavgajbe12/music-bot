@@ -1,5 +1,6 @@
 const { buildNowPlayingV2, buildSetupNowPlayingV2, extractDominantColor } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
+const { logToWebhook } = require('../../utils/webhookLogger');
 
 module.exports = {
   /**
@@ -11,6 +12,24 @@ module.exports = {
     const guildId = player.guildId;
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
+
+    console.log(
+      `[playerStart] Track started: "${track.title}" by "${track.author}" | source=${track.sourceName} | guild=${guildId}`,
+    );
+
+    // Log track start to webhook for debugging
+    logToWebhook({
+      title: '▶️ Track Started',
+      color: 0x57f287,
+      fields: [
+        { name: 'Guild ID', value: guildId, inline: true },
+        { name: 'Source', value: track.sourceName || 'Unknown', inline: true },
+        { name: 'Track', value: `${track.title} — ${track.author || 'Unknown'}` },
+        { name: 'URI', value: track.uri || 'N/A' },
+        { name: 'Has Setup Channel', value: setupInfo ? `✅ ${setupInfo.channelId}` : '❌ No', inline: true },
+        { name: 'Text Channel', value: player.data.get('textChannel') || 'N/A', inline: true },
+      ],
+    }).catch(() => {});
 
     // Extract dominant color once, reuse for all panels
     const artUrl = track.thumbnail || track.artworkUrl || null;
