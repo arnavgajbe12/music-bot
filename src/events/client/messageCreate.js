@@ -1,7 +1,6 @@
 const config = require('../../../config');
 const { buildErrorEmbed } = require('../../utils/embeds');
 const { getSetup, getSettings } = require('../../utils/setupManager');
-const { searchWithFallback } = require('../../utils/functions');
 
 // Map short platform prefixes to Kazagumo/LavaSrc search prefixes
 const PLATFORM_PREFIXES = {
@@ -35,6 +34,21 @@ module.exports = {
       const content = message.content.trim();
       if (!content) return;
 
+      // Check for platform prefix (e.g. "yt Blinding Lights")
+      let query;
+      const firstWord = content.split(/\s+/)[0].toLowerCase();
+      const rest = content.split(/\s+/).slice(1).join(' ').trim();
+      if (PLATFORM_PREFIXES[firstWord] && rest) {
+        query = `${PLATFORM_PREFIXES[firstWord]}${rest}`;
+      } else if (/^https?:\/\//i.test(content)) {
+        query = content;
+      } else {
+        // Use the guild's stored playback source, or fall back to config default
+        const guildSettings = getSettings(message.guild.id);
+        const searchPrefix = guildSettings.playbackSource || `${config.player.defaultSearchPlatform}:`;
+        query = `${searchPrefix}${content}`;
+      }
+
       let player = client.manager.players.get(message.guild.id);
       if (!player) {
         player = await client.manager.createPlayer({
@@ -47,36 +61,13 @@ module.exports = {
         player.data.set('textChannel', setupInfo.channelId);
       }
 
-      // Determine search query: explicit platform prefix, URL, or fallback chain
       let result;
       try {
-        const firstWord = content.split(/\s+/)[0].toLowerCase();
-        const rest = content.split(/\s+/).slice(1).join(' ').trim();
-        if (PLATFORM_PREFIXES[firstWord] && rest) {
-          // Explicit platform prefix (e.g. "yt Blinding Lights")
-          result = await client.manager.search(`${PLATFORM_PREFIXES[firstWord]}${rest}`, { requester: message.author });
-          if (!result || !result.tracks.length) {
-            result = await searchWithFallback(client.manager, rest, message.author);
-          }
-        } else if (/^https?:\/\//i.test(content)) {
-          // Direct URL – use as-is
-          result = await client.manager.search(content, { requester: message.author });
-        } else {
-          // Plain text query – use the guild's configured source then fall back
-          const guildSettings = getSettings(message.guild.id);
-          if (guildSettings.playbackSource) {
-            result = await client.manager.search(`${guildSettings.playbackSource}${content}`, { requester: message.author });
-          }
-          if (!result || !result.tracks.length) {
-            result = await searchWithFallback(client.manager, content, message.author);
-          }
-        }
+        result = await client.manager.search(query, { requester: message.author });
       } catch {
-        try {
-          result = await searchWithFallback(client.manager, content, message.author);
-        } catch (err) {
-          console.error('[messageCreate] Setup channel search error:', err);
-        }
+        const err = await message.channel.send({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+        setTimeout(() => err.delete().catch(() => {}), 5000);
+        return;
       }
 
       if (!result || !result.tracks.length) {
