@@ -265,19 +265,25 @@ function buildIdleV2(artUrl, largeArt = true) {
 // ─── Setup Channel Builders ───────────────────────────────────────────────────
 
 /**
- * Build the Setup Channel 4-button control row.
- * All buttons are the same style (Secondary/Grey), except Pause toggles to
- * Success (green) when the player is paused and Stop is always Danger (red).
+ * Row 1 of the Setup Channel controls:
+ * 📋 Queue | ⏮️ Previous | ⏸️ Pause | ⏭️ Skip
+ * All buttons are Secondary (grey) by default.
+ * Queue turns Success (green) when isQueueView is true.
  * @param {object} player - KazagumoPlayer
+ * @param {boolean} [isQueueView=false]
  * @returns {ActionRowBuilder}
  */
-function buildSetupButtonsV2(player) {
+function buildSetupRow1V2(player, isQueueView = false) {
   const hasPrevious = Array.isArray(player.queue.previous)
     ? player.queue.previous.length > 0
     : player.queue.previous != null;
   const isPaused = player.paused;
 
   return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('setup_queue')
+      .setEmoji('📋')
+      .setStyle(isQueueView ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('player_previous')
       .setEmoji(config.emojis.previous)
@@ -286,24 +292,25 @@ function buildSetupButtonsV2(player) {
     new ButtonBuilder()
       .setCustomId('player_pause')
       .setEmoji(isPaused ? config.emojis.play : config.emojis.pause)
-      .setStyle(isPaused ? ButtonStyle.Success : ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('player_skip')
       .setEmoji(config.emojis.skip)
       .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('player_stop')
-      .setEmoji(config.emojis.stop)
-      .setStyle(ButtonStyle.Danger),
   );
 }
 
 /**
- * Build the Setup Channel disabled button row (for idle state).
+ * Disabled version of Row 1 (for idle state).
  * @returns {ActionRowBuilder}
  */
-function buildSetupDisabledButtonsV2() {
+function buildSetupRow1DisabledV2() {
   return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('setup_queue')
+      .setEmoji('📋')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
     new ButtonBuilder()
       .setCustomId('player_previous')
       .setEmoji(config.emojis.previous)
@@ -319,92 +326,141 @@ function buildSetupDisabledButtonsV2() {
       .setEmoji(config.emojis.skip)
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('player_stop')
-      .setEmoji(config.emojis.stop)
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(true),
   );
 }
 
 /**
- * Build Row 2 of the Setup Channel controls:
- * Queue (🎛️), Shuffle (🔀), Vol Down (🔉), Vol Up (🔊).
- * When isQueueView is true, the Queue button is highlighted green.
- * @param {boolean} [isQueueView=false]
+ * Row 2 of the Setup Channel controls: "🎛️ Controller" dropdown.
+ * Options: Volume, Loop Track, Loop Queue, Clear Queue, Disconnect.
+ * Labels reflect the current loop state when a player is provided.
+ * @param {object|null} [player] - KazagumoPlayer (for loop-state labels)
  * @returns {ActionRowBuilder}
  */
-function buildSetupRow2V2(isQueueView = false) {
+function buildSetupControllerDropdownV2(player) {
+  const loopMode = player?.loop || 'none';
+
+  const loopTrackActive = loopMode === 'track';
+  const loopQueueActive = loopMode === 'queue';
+
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('setup_controller')
+      .setPlaceholder('🎛️ Controller')
+      .addOptions([
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Volume')
+          .setEmoji('🔊')
+          .setDescription('Adjust playback volume')
+          .setValue('controller_volume'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel(loopTrackActive ? 'Loop Track (ON)' : 'Loop Track')
+          .setEmoji(loopTrackActive ? '🔂' : '🔁')
+          .setDescription('Toggle single-track repeat')
+          .setValue('controller_loop_track'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel(loopQueueActive ? 'Loop Queue (ON)' : 'Loop Queue')
+          .setEmoji('🔁')
+          .setDescription('Toggle full-queue repeat')
+          .setValue('controller_loop_queue'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Clear Queue')
+          .setEmoji('🗑️')
+          .setDescription('Remove all upcoming tracks')
+          .setValue('controller_clear_queue'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Disconnect')
+          .setEmoji('👋')
+          .setDescription('Stop music and leave the voice channel')
+          .setValue('controller_disconnect'),
+      ]),
+  );
+}
+
+/**
+ * Disabled version of the Controller dropdown (for idle state).
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupControllerDropdownDisabledV2() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('setup_controller')
+      .setPlaceholder('🎛️ Controller')
+      .setDisabled(true)
+      .addOptions([
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Volume')
+          .setEmoji('🔊')
+          .setValue('controller_volume'),
+      ]),
+  );
+}
+
+/**
+ * Row 3 of the Setup Channel controls:
+ * 🔀 Shuffle (toggle – Primary/Blue when shuffle mode is on) | ⚙️ Settings
+ * @param {object|null} [player] - KazagumoPlayer (for shuffle state)
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupRow3V2(player) {
+  const isShuffled = player?.data?.get('shuffleMode') === true;
+
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('setup_queue')
-      .setEmoji('🎛️')
-      .setStyle(isQueueView ? ButtonStyle.Success : ButtonStyle.Secondary),
-    new ButtonBuilder()
       .setCustomId('setup_shuffle')
-      .setEmoji(config.emojis.shuffle)
-      .setStyle(ButtonStyle.Secondary),
+      .setEmoji('🔀')
+      .setLabel('Shuffle')
+      .setStyle(isShuffled ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId('setup_vol_down')
-      .setEmoji(config.emojis.volumeDown)
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_up')
-      .setEmoji(config.emojis.volumeUp)
+      .setCustomId('setup_settings')
+      .setEmoji('⚙️')
+      .setLabel('Settings')
       .setStyle(ButtonStyle.Secondary),
   );
 }
 
 /**
- * Build Row 2 of the Setup Channel controls in disabled state (for idle panel).
+ * Disabled version of Row 3 (for idle state).
  * @returns {ActionRowBuilder}
  */
-function buildSetupRow2DisabledV2() {
+function buildSetupRow3DisabledV2() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('setup_queue')
-      .setEmoji('🎛️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
       .setCustomId('setup_shuffle')
-      .setEmoji(config.emojis.shuffle)
+      .setEmoji('🔀')
+      .setLabel('Shuffle')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
-      .setCustomId('setup_vol_down')
-      .setEmoji(config.emojis.volumeDown)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_up')
-      .setEmoji(config.emojis.volumeUp)
+      .setCustomId('setup_settings')
+      .setEmoji('⚙️')
+      .setLabel('Settings')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
   );
 }
+
+// Keep legacy aliases so existing call-sites that haven't been updated yet
+// continue to work without error.
+const buildSetupButtonsV2 = (player) => buildSetupRow1V2(player, false);
+const buildSetupDisabledButtonsV2 = buildSetupRow1DisabledV2;
+const buildSetupRow2V2 = (isQueueView) => buildSetupControllerDropdownV2(null);
+const buildSetupRow2DisabledV2 = buildSetupControllerDropdownDisabledV2;
 
 /**
  * Build the Setup Channel Now Playing Component v2 panel.
- * This is the permanent panel in the song-request channel.
  *
  * Layout:
- *  - Dynamic accent color (extracted from thumbnail, random on failure)
- *  - Header (medium text): Emoji Source Name - [Song Title](URL)
- *  - Large image: track thumbnail
- *  - Body (large text): ## Song Title  (no link)
- *  - Subtext: Artist • Duration
+ *  - Accent color stripe
+ *  - Header line: Emoji Source – [Song Title](URL)
+ *  - Section: ### 🎵  Song Title / Artist / -# Duration  +  square thumbnail
  *  - Separator
- *  - Row 1: ⏮️ Previous | ⏯️ Pause | ⏭️ Skip | ⏹️ Stop
- *  - Row 2: 🎛️ Queue | 🔀 Shuffle | 🔉 Vol Down | 🔊 Vol Up
- *
- * NOTE: No user pings anywhere.
+ *  - Row 1: 📋 Queue | ⏮️ Previous | ⏸️ Pause | ⏭️ Skip
+ *  - Row 2: 🎛️ Controller dropdown
+ *  - Row 3: 🔀 Shuffle | ⚙️ Settings
  *
  * @param {object} track  - KazagumoTrack
  * @param {object} player - KazagumoPlayer
- * @param {number} [accentColor] - Pre-computed accent color (integer). If omitted
- *   the function will attempt extraction asynchronously — caller should pass the
- *   result of `extractDominantColor` to avoid blocking.
+ * @param {number} [accentColor] - Pre-computed accent color (integer).
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
 function buildSetupNowPlayingV2(track, player, accentColor) {
@@ -413,43 +469,35 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const trackUrl = track.uri || null;
 
-  // Clickable header: 🔴 YouTube Music - [Blinding Lights](https://...)
+  const container = new ContainerBuilder();
+  const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
+  container.setAccentColor(color);
+
+  // Small clickable header line: 🔴 YouTube Music – [Blinding Lights](url)
   const headerText = trackUrl
     ? `${platformEmoji} ${sourceDisplay} - [${track.title}](${trackUrl})`
     : `${platformEmoji} ${sourceDisplay} - ${track.title}`;
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(headerText));
 
-  const container = new ContainerBuilder();
-
-  // Apply accent color (left color stripe)
-  const color =
-    accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
-  container.setAccentColor(color);
-
-  // Small clickable header line
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(headerText),
-  );
-
-  // Large thumbnail image
-  container.addMediaGalleryComponents(
-    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-  );
-
-  // Large song title (## = large text, no link)
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${track.title}`),
-  );
-
-  // Artist • Duration subtext
+  // Main section: title / artist / duration + square thumbnail accessory
   const artist = track.author || 'Unknown Artist';
-  const duration = formatDuration(track.length);
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`${artist} • ${duration}`),
-  );
+  const total = track.length || 0;
+  const position = player.position || 0;
+  const durationLine = position > 0
+    ? `-# ${formatDuration(position)} / ${formatDuration(total)}`
+    : `-# ${formatDuration(total)}`;
+
+  const mainText = `### ${config.emojis.music}  ${track.title}\n${artist}\n${durationLine}`;
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(mainText))
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+  container.addSectionComponents(section);
 
   container.addSeparatorComponents(new SeparatorBuilder());
-  container.addActionRowComponents(buildSetupButtonsV2(player));
-  container.addActionRowComponents(buildSetupRow2V2(false));
+  container.addActionRowComponents(buildSetupRow1V2(player, false));
+  container.addActionRowComponents(buildSetupControllerDropdownV2(player));
+  container.addActionRowComponents(buildSetupRow3V2(player));
 
   return {
     components: [container],
@@ -481,8 +529,9 @@ function buildSetupIdleV2() {
   );
 
   container.addSeparatorComponents(new SeparatorBuilder());
-  container.addActionRowComponents(buildSetupDisabledButtonsV2());
-  container.addActionRowComponents(buildSetupRow2DisabledV2());
+  container.addActionRowComponents(buildSetupRow1DisabledV2());
+  container.addActionRowComponents(buildSetupControllerDropdownDisabledV2());
+  container.addActionRowComponents(buildSetupRow3DisabledV2());
 
   return {
     components: [container],
@@ -518,60 +567,74 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Current track header
-  const currentEmoji = resolvePlatformEmoji(currentTrack.sourceName);
-  const currentArtUrl = currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail;
-  const currentTrackUrl = currentTrack.uri || null;
-  const currentTitle = currentTrackUrl
-    ? `[${currentTrack.title}](${currentTrackUrl})`
-    : currentTrack.title;
+  // Duration for the current track (show progress/total when position > 0)
+  const total = currentTrack.length || 0;
+  const position = player?.position || 0;
+  const durationLine = position > 0
+    ? `-# ${formatDuration(position)} / ${formatDuration(total)}`
+    : `-# ${formatDuration(total)}`;
 
-  // Section: current track with small thumbnail accessory
-  const section = new SectionBuilder()
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `▶️ **Now Playing**\n${currentEmoji} **${currentTitle}**\n${currentTrack.author || 'Unknown'} • ${formatDuration(currentTrack.length)}`,
-      ),
-    )
-    .setThumbnailAccessory(new ThumbnailBuilder().setURL(currentArtUrl));
-  container.addSectionComponents(section);
+  // Requester line for the current track (number 01)
+  const currentRequester = currentTrack.requester;
+  const currentRequesterLine = currentRequester?.id
+    ? `-# \`01\`・<@${currentRequester.id}>`
+    : `-# \`01\``;
 
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  // Upcoming tracks list
-  const trackListText = pageTracks.length
+  // Build upcoming track lines
+  const upcomingLines = pageTracks.length
     ? pageTracks
         .map((t, i) => {
-          const emoji = resolvePlatformEmoji(t.sourceName);
-          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
+          // queue number: current = 01, 1st upcoming = 02, etc.
+          const num = String(start + i + 2).padStart(2, '0');
+          const requester = t.requester;
+          const requesterLine = requester?.id
+            ? `-# \`${num}\`・<@${requester.id}>`
+            : `-# \`${num}\``;
+          const artist = t.author || 'Unknown Artist';
+          return `**${t.title}** - ${artist}\n${requesterLine}`;
         })
         .join('\n')
-    : '*No upcoming tracks.*';
+    : '';
 
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackListText));
+  // Compose the full text block
+  const queueCount = tracks.length;
+  const currentArtist = currentTrack.author || 'Unknown Artist';
+  const queueText =
+    `QUEUE・${queueCount} ${queueCount === 1 ? 'song' : 'songs'}\n` +
+    `### ▶️  ${currentTrack.title}\n` +
+    `${currentArtist}\n` +
+    `${durationLine}\n` +
+    `${currentRequesterLine}` +
+    (upcomingLines ? `\n${upcomingLines}` : '');
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(queueText));
 
   container.addSeparatorComponents(new SeparatorBuilder());
 
-  // Navigation row (⬆️ Prev page / ⬇️ Next page)
-  container.addActionRowComponents(
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`setup_queue_nav:${clampedPage - 1}`)
-        .setEmoji('⬆️')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(clampedPage <= 1),
-      new ButtonBuilder()
-        .setCustomId(`setup_queue_nav:${clampedPage + 1}`)
-        .setEmoji('⬇️')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(clampedPage >= totalPages),
-    ),
-  );
+  // Navigation row — only shown when there are multiple pages of upcoming tracks
+  if (totalPages > 1) {
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`setup_queue_nav:${clampedPage - 1}`)
+          .setEmoji('⬆️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(clampedPage <= 1),
+        new ButtonBuilder()
+          .setCustomId(`setup_queue_nav:${clampedPage + 1}`)
+          .setEmoji('⬇️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(clampedPage >= totalPages),
+      ),
+    );
+  }
 
-  // Control Row 1 (Previous, Pause, Skip, Stop) — always visible
-  container.addActionRowComponents(buildSetupButtonsV2(player));
-  // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up) — always visible
-  container.addActionRowComponents(buildSetupRow2V2(true));
+  // Control Row 1: Queue (green/active), Previous, Pause, Skip
+  container.addActionRowComponents(buildSetupRow1V2(player, true));
+  // Control Row 2: Controller dropdown
+  container.addActionRowComponents(buildSetupControllerDropdownV2(player));
+  // Control Row 3: Shuffle, Settings
+  container.addActionRowComponents(buildSetupRow3V2(player));
 
   return {
     components: [container],
@@ -937,6 +1000,14 @@ module.exports = {
   buildIdleV2,
   buildSetupIdleV2,
   buildSetupNowPlayingV2,
+  // New setup row builders
+  buildSetupRow1V2,
+  buildSetupRow1DisabledV2,
+  buildSetupControllerDropdownV2,
+  buildSetupControllerDropdownDisabledV2,
+  buildSetupRow3V2,
+  buildSetupRow3DisabledV2,
+  // Legacy aliases (kept for compatibility)
   buildSetupButtonsV2,
   buildSetupDisabledButtonsV2,
   buildSetupRow2V2,
