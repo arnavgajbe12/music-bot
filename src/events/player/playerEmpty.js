@@ -103,7 +103,7 @@ module.exports = {
 
     if (config.player.leaveOnEmpty) {
       setTimeout(() => {
-        if (!player.playing && player.queue.size === 0) {
+        if (!player.playing && player.queue.length === 0) {
           player.destroy().catch(() => {});
         }
       }, 5000);

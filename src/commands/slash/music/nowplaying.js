@@ -1,13 +1,12 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('../../../utils/embeds');
-const { buildNowPlayingV2NoButtons } = require('../../../utils/componentBuilder');
-const { getSettings } = require('../../../utils/setupManager');
+const { buildNowPlayingEmbed } = require('../../../utils/componentBuilder');
 
 module.exports = {
   data: new SlashCommandBuilder().setName('nowplaying').setDescription('Show the currently playing track.'),
 
   async run(client, interaction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: false });
 
     const player = client.manager.players.get(interaction.guild.id);
     if (!player || !player.queue.current) {
@@ -21,8 +20,7 @@ module.exports = {
       player.data.delete('npCmdMessage');
     }
 
-    const settings = getSettings(interaction.guild.id);
-    const payload = buildNowPlayingV2NoButtons(player.queue.current, player, settings.largeArt);
+    const payload = buildNowPlayingEmbed(player.queue.current, player);
 
     const msg = await interaction.editReply(payload);
     player.data.set('npCmdMessage', msg);

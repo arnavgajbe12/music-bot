@@ -133,7 +133,8 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
       const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
       const voiceChannel = message.member.voice.channel;
 
-      await message.channel.sendTyping();
+      // Item 7: Send a "Searching..." message instead of the typing indicator
+      const searchMsg = await message.channel.send({ content: `🔍 Searching for \`${rawQuery}\` on ${platformLabel}...` });
 
       let player = client.manager.players.get(message.guild.id);
       if (!player) {
@@ -169,12 +170,17 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         result = await client.manager.search(query, { requester: message.author, source: '' });
       } catch (error) {
         console.error(`[prefix ${name}] Search error:`, error);
-        return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+        await searchMsg.edit({ content: `❌ Failed to search for that track.` }).catch(() => {});
+        return;
       }
 
       if (!result || !result.tracks.length) {
-        return message.reply({ embeds: [buildErrorEmbed(`No results found on ${platformLabel}.`)] });
+        await searchMsg.edit({ content: `❌ No results found on ${platformLabel}.` }).catch(() => {});
+        return;
       }
+
+      // Delete the searching message now that we have results
+      searchMsg.delete().catch(() => {});
 
       const wasIdle = !player.playing && !player.paused;
 
@@ -183,7 +189,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         if (!wasIdle) {
           const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
-          const reply = await message.reply(payload);
+          const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
           setTimeout(() => reply.delete().catch(() => {}), 15000);
           if (!player.playing && !player.paused) await player.play();
           return;
@@ -192,9 +198,9 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         const track = result.tracks[0];
         player.queue.add(track);
         if (!wasIdle) {
-          const queueSize = player.queue.size ?? player.queue.length;
+          const queueSize = player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
-          const reply = await message.reply(payload);
+          const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
           setTimeout(() => reply.delete().catch(() => {}), 15000);
           if (!player.playing && !player.paused) await player.play();
           return;

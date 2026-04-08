@@ -166,10 +166,12 @@ module.exports = (client) => {
               const isSetupMsg = setupInfo && interaction.message?.id === setupInfo.messageId;
               const isControlMsg = controlMsgId && interaction.message?.id === controlMsgId;
               let payload;
-              if (isSetupMsg || isControlMsg) {
+              if (isSetupMsg) {
                 const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
                 const accentColor = await resolveAccentColor(player, artUrl);
                 payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
+              } else if (isControlMsg) {
+                payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
               } else {
                 payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
               }
@@ -251,6 +253,43 @@ module.exports = (client) => {
             await interaction.reply({ embeds: [buildErrorEmbed('Unknown option selected.')], ephemeral: true });
         }
         return;
+      }
+
+      // ── "Recommend" dropdown in setup channel queue view ─────────────────
+      if (interaction.customId === 'setup_recommend_select') {
+        const player = client.manager.players.get(interaction.guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        const voiceChannel = interaction.member.voice?.channel;
+        if (!voiceChannel || voiceChannel.id !== player.voiceId) {
+          return interaction.reply({
+            embeds: [buildErrorEmbed('You must be in the same voice channel as the bot to use controls.')],
+            ephemeral: true,
+          });
+        }
+
+        const val = interaction.values[0]; // format: "rec:<i>:<uri>"
+        const recommendations = player.data.get('setupRecommendations') || [];
+        const parts = val.split(':');
+        const recIdx = parseInt(parts[1], 10);
+        const recTrack = recommendations[recIdx];
+
+        if (!recTrack) {
+          return interaction.reply({ embeds: [buildErrorEmbed('That recommendation is no longer available.')], ephemeral: true });
+        }
+
+        player.queue.add(recTrack);
+        await interaction.deferUpdate();
+        return interaction.followUp({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(config.embeds.color)
+              .setDescription(`✨ Added **${recTrack.title}** by ${recTrack.author || 'Unknown'} to the queue.`),
+          ],
+          ephemeral: true,
+        });
       }
 
       return;
@@ -349,12 +388,31 @@ module.exports = (client) => {
             const payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
             return interaction.update(payload);
           } else {
-            // Switch to queue view
+            // Switch to queue view — fetch recommendations asynchronously
             player.data.set('setupQueueView', true);
             player.data.set('setupQueuePage', 1);
+            await interaction.deferUpdate();
+
+            // Search for related songs based on current track
+            let recommendations = [];
+            try {
+              const currentTrack = player.queue.current;
+              const searchQuery = `ytmsearch:${[currentTrack.author, currentTrack.title].filter(Boolean).join(' ')}`;
+              const recResult = await client.manager.search(searchQuery, { requester: currentTrack.requester, source: '' });
+              if (recResult && recResult.tracks && recResult.tracks.length > 0) {
+                // Filter out the current song, take up to 10
+                recommendations = recResult.tracks
+                  .filter((t) => !(t.title === currentTrack.title && t.author === currentTrack.author))
+                  .slice(0, 10);
+              }
+            } catch {
+              // Recommendations are optional — non-fatal
+            }
+            player.data.set('setupRecommendations', recommendations);
+
             const tracks = [...player.queue];
-            const payload = buildSetupQueueViewV2(player.queue.current, tracks, 1, accentColor, player);
-            return interaction.update(payload);
+            const payload = buildSetupQueueViewV2(player.queue.current, tracks, 1, accentColor, player, recommendations);
+            return interaction.editReply(payload);
           }
         }
 
@@ -459,18 +517,22 @@ module.exports = (client) => {
           const isSetupMsg = setupInfo && interaction.message.id === setupInfo.messageId;
           const isControlMsg = controlMsgId && interaction.message.id === controlMsgId;
 
-          if (isSetupMsg || isControlMsg) {
-            // Setup channel or control panel — respect current view mode
+          if (isSetupMsg) {
+            // Setup channel — respect current view mode
             const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
             const accentColor = await resolveAccentColor(player, artUrl);
             const isQueueView = player.data.get('setupQueueView') === true;
             if (isQueueView) {
               const tracks = [...player.queue];
               const qPage = player.data.get('setupQueuePage') || 1;
-              payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player);
+              const recommendations = player.data.get('setupRecommendations') || [];
+              payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player, recommendations);
             } else {
               payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
             }
+          } else if (isControlMsg) {
+            // Portable control panel — same style as !play
+            payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
           } else {
             payload = buildNowPlayingV2(player.queue.current, player, settings.largeArt);
           }

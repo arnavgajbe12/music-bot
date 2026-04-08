@@ -1,6 +1,5 @@
 const { buildErrorEmbed } = require('../../../utils/embeds');
-const { buildNowPlayingV2NoButtons } = require('../../../utils/componentBuilder');
-const { getSettings } = require('../../../utils/setupManager');
+const { buildNowPlayingEmbed } = require('../../../utils/componentBuilder');
 
 module.exports = {
   name: 'nowplaying',
@@ -11,20 +10,20 @@ module.exports = {
   async run(client, message) {
     const player = client.manager.players.get(message.guild.id);
     if (!player || !player.queue.current) {
-      return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
-    // Delete the previous !np message if one exists
+    // Delete the previous !np message if one exists (no duplicates)
     const oldNpMsg = player.data.get('npCmdMessage');
     if (oldNpMsg) {
       oldNpMsg.delete().catch(() => {});
       player.data.delete('npCmdMessage');
     }
 
-    const settings = getSettings(message.guild.id);
-    const payload = buildNowPlayingV2NoButtons(player.queue.current, player, settings.largeArt);
+    const payload = buildNowPlayingEmbed(player.queue.current, player);
 
-    const msg = await message.reply(payload);
+    // Send without pinging the user (item 6)
+    const msg = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
     player.data.set('npCmdMessage', msg);
   },
 };

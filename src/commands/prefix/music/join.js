@@ -29,6 +29,18 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
     }
 
+    if (player && player.voiceId !== voiceChannel.id) {
+      // Bot is in a different VC — move it to the user's VC
+      try {
+        await message.guild.members.me.voice.setChannel(voiceChannel);
+        player.voiceId = voiceChannel.id;
+      } catch {
+        // If move fails, destroy and recreate
+        await player.destroy().catch(() => {});
+        player = null;
+      }
+    }
+
     if (!player) {
       player = await client.manager.createPlayer({
         guildId: message.guild.id,

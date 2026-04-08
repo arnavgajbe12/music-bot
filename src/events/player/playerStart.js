@@ -73,7 +73,7 @@ module.exports = {
         if (controlChannel?.isTextBased()) {
           const controlMsg = await controlChannel.messages.fetch(controlMsgId).catch(() => null);
           if (controlMsg?.editable) {
-            const payload = buildSetupNowPlayingV2(track, player, accentColor);
+            const payload = buildNowPlayingV2(track, player, settings.largeArt);
             await controlMsg.edit(payload).catch(() => {});
           }
         }
