@@ -6,7 +6,7 @@ const { checkVoice } = require('../../../utils/functions');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('disconnect')
-    .setDescription('Stop playback, clear the queue, and leave the voice channel.'),
+    .setDescription('Destroy the player and forcefully disconnect the bot from the Voice Channel.'),
 
   async run(client, interaction) {
     await interaction.deferReply({ ephemeral: true });
@@ -23,10 +23,26 @@ module.exports = {
 
     const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
+    // Clear queue and destroy player
     player.queue.clear();
-    await player.destroy().catch(() => {});
+    try {
+      await player.destroy();
+    } catch {
+      // Ignore
+    }
+
+    // Force the bot to leave the VC via the voice adapter if still connected
+    try {
+      const botVoice = interaction.guild.members.me?.voice;
+      if (botVoice?.channel) {
+        await botVoice.disconnect();
+      }
+    } catch {
+      // Non-fatal
+    }
 
     const payload = buildConfirmV2(`👋 Left **${channelName}** and cleared the queue.`, 0xed4245);
     return interaction.editReply(payload);
   },
 };
+

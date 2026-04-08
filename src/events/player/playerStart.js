@@ -13,8 +13,13 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
+    // ── Absolute queue index tracking (item 7) ───────────────────────────────
+    // Increment a never-resetting counter for each new track
+    const prevIdx = player.data.get('absoluteQueueIndex') ?? 0;
+    player.data.set('absoluteQueueIndex', prevIdx + 1);
+
     console.log(
-      `[playerStart] Track started: "${track.title}" by "${track.author}" | source=${track.sourceName} | guild=${guildId}`,
+      `[playerStart] Track started: "${track.title}" by "${track.author}" | source=${track.sourceName} | guild=${guildId} | absIdx=${prevIdx + 1}`,
     );
 
     // Log track start to webhook for debugging

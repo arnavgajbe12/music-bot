@@ -14,14 +14,18 @@ module.exports = {
       return interaction.editReply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
+    // Delete the previous /nowplaying message if one exists (no duplicates)
+    const oldNpMsg = player.data.get('npCmdMessage');
+    if (oldNpMsg) {
+      oldNpMsg.delete().catch(() => {});
+      player.data.delete('npCmdMessage');
+    }
+
     const settings = getSettings(interaction.guild.id);
     const payload = buildNowPlayingV2NoButtons(player.queue.current, player, settings.largeArt);
 
     const msg = await interaction.editReply(payload);
-
-    // Store the message reference on the player so playerEnd/playerStart can delete it
-    const existingMsgs = player.data.get('nowPlayingCmdMessages') || [];
-    existingMsgs.push(msg);
-    player.data.set('nowPlayingCmdMessages', existingMsgs);
+    player.data.set('npCmdMessage', msg);
   },
 };
+

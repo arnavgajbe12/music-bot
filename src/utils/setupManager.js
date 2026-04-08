@@ -1,8 +1,10 @@
 /**
  * setupManager.js
  * Handles persistence for:
- *  - setup.json  → guild setup channel & permanent message IDs
+ *  - setup.json    → guild setup channel & permanent message IDs
  *  - settings.json → per-guild feature toggles (largeArt, autoplay, mode247)
+ *  - noprefix.json → users granted no-prefix access (with optional expiry)
+ *  - prefix.json   → per-guild custom prefixes
  */
 
 const fs = require('fs');
@@ -11,6 +13,8 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const SETUP_FILE = path.join(DATA_DIR, 'setup.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const NOPREFIX_FILE = path.join(DATA_DIR, 'noprefix.json');
+const PREFIX_FILE = path.join(DATA_DIR, 'prefix.json');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -98,4 +102,142 @@ function updateSettings(guildId, updates) {
   writeJSON(SETTINGS_FILE, data);
 }
 
-module.exports = { saveSetup, removeSetup, getSetup, getSettings, updateSettings };
+// ── No-Prefix System ──────────────────────────────────────────────────────────
+
+/**
+ * Add a user to the no-prefix list.
+ * @param {string} userId
+ * @param {number|null} expiresAt - Unix ms timestamp, or null for permanent
+ */
+function noprefixAdd(userId, expiresAt) {
+  const data = readJSON(NOPREFIX_FILE);
+  data[userId] = { expiresAt: expiresAt ?? null, enabled: true };
+  writeJSON(NOPREFIX_FILE, data);
+}
+
+/**
+ * Remove a user from the no-prefix list.
+ * @param {string} userId
+ */
+function noprefixRemove(userId) {
+  const data = readJSON(NOPREFIX_FILE);
+  delete data[userId];
+  writeJSON(NOPREFIX_FILE, data);
+}
+
+/**
+ * Get all no-prefix entries (may include expired ones).
+ * @returns {Object<string, { expiresAt: number|null, enabled: boolean }>}
+ */
+function noprefixList() {
+  return readJSON(NOPREFIX_FILE);
+}
+
+/**
+ * Check if a user currently has no-prefix access (not expired, not disabled).
+ * @param {string} userId
+ * @returns {boolean}
+ */
+function hasNoPrefix(userId) {
+  const data = readJSON(NOPREFIX_FILE);
+  const entry = data[userId];
+  if (!entry) return false;
+  if (entry.enabled === false) return false;
+  if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+    // Auto-remove expired entries
+    delete data[userId];
+    writeJSON(NOPREFIX_FILE, data);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Toggle no-prefix for a user (must already have an entry).
+ * @param {string} userId
+ * @param {boolean} enabled
+ */
+function noprefixSetEnabled(userId, enabled) {
+  const data = readJSON(NOPREFIX_FILE);
+  if (!data[userId]) return;
+  data[userId].enabled = enabled;
+  writeJSON(NOPREFIX_FILE, data);
+}
+
+// ── Custom Server Prefixes ────────────────────────────────────────────────────
+
+/**
+ * Get the active prefixes for a guild. Falls back to config default.
+ * @param {string} guildId
+ * @returns {string[]}
+ */
+function getPrefixes(guildId) {
+  const data = readJSON(PREFIX_FILE);
+  const entry = data[guildId];
+  if (!entry || !entry.prefixes || entry.prefixes.length === 0) {
+    const config = require('../../config');
+    return [config.botSetup.prefix];
+  }
+  return entry.prefixes;
+}
+
+/**
+ * Set (overwrite) the prefix list for a guild.
+ * @param {string} guildId
+ * @param {string[]} prefixes
+ */
+function setPrefixes(guildId, prefixes) {
+  const data = readJSON(PREFIX_FILE);
+  data[guildId] = { prefixes };
+  writeJSON(PREFIX_FILE, data);
+}
+
+/**
+ * Add a prefix to a guild's prefix list (no duplicates).
+ * @param {string} guildId
+ * @param {string} prefix
+ */
+function addPrefix(guildId, prefix) {
+  const current = getPrefixes(guildId);
+  const config = require('../../config');
+  const base = current.filter((p) => p !== config.botSetup.prefix);
+  if (!base.includes(prefix)) base.push(prefix);
+  setPrefixes(guildId, base.length > 0 ? base : [prefix]);
+}
+
+/**
+ * Remove a prefix from a guild's prefix list.
+ * @param {string} guildId
+ * @param {string} prefix
+ * @returns {boolean} true if removed, false if not found
+ */
+function removePrefix(guildId, prefix) {
+  const current = getPrefixes(guildId);
+  const filtered = current.filter((p) => p !== prefix);
+  if (filtered.length === current.length) return false;
+  const data = readJSON(PREFIX_FILE);
+  if (filtered.length === 0) {
+    delete data[guildId];
+  } else {
+    data[guildId] = { prefixes: filtered };
+  }
+  writeJSON(PREFIX_FILE, data);
+  return true;
+}
+
+module.exports = {
+  saveSetup,
+  removeSetup,
+  getSetup,
+  getSettings,
+  updateSettings,
+  noprefixAdd,
+  noprefixRemove,
+  noprefixList,
+  hasNoPrefix,
+  noprefixSetEnabled,
+  getPrefixes,
+  setPrefixes,
+  addPrefix,
+  removePrefix,
+};

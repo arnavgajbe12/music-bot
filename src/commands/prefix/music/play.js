@@ -45,22 +45,19 @@ module.exports = {
       });
       player.data.set('textChannel', message.channel.id);
     } else {
-      // Update text channel if the user is issuing the command from a different channel
-      const prevChannelId = player.data.get('textChannel');
-      if (prevChannelId && prevChannelId !== message.channel.id) {
-        player.data.set('textChannel', message.channel.id);
-        // Delete the old now-playing message so the new one appears in this channel
-        const oldMsgId = player.data.get('nowPlayingMessageId');
-        const oldChannelId = player.data.get('nowPlayingMessageChannelId');
-        if (oldMsgId && oldChannelId) {
-          const oldChannel = client.channels.cache.get(oldChannelId);
-          if (oldChannel?.isTextBased()) {
-            oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
-          }
-          player.data.delete('nowPlayingMessage');
-          player.data.delete('nowPlayingMessageId');
-          player.data.delete('nowPlayingMessageChannelId');
+      // Always update the text channel to where !play was just used (item 3)
+      player.data.set('textChannel', message.channel.id);
+      // Delete the old now-playing message so the new one appears in this channel
+      const oldMsgId = player.data.get('nowPlayingMessageId');
+      const oldChannelId = player.data.get('nowPlayingMessageChannelId');
+      if (oldMsgId && oldChannelId) {
+        const oldChannel = client.channels.cache.get(oldChannelId);
+        if (oldChannel?.isTextBased()) {
+          oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
         }
+        player.data.delete('nowPlayingMessage');
+        player.data.delete('nowPlayingMessageId');
+        player.data.delete('nowPlayingMessageChannelId');
       }
     }
 

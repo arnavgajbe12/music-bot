@@ -95,6 +95,8 @@ module.exports = {
     // Clean up stored references
     player.data.delete('nowPlayingMessage');
     player.data.delete('nowPlayingMessageId');
+    // Reset absolute queue index when the queue is fully exhausted
+    player.data.delete('absoluteQueueIndex');
 
     // Respect 24/7 mode – if enabled, never destroy the player
     if (settings.mode247) return;

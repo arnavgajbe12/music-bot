@@ -26,6 +26,7 @@ const CATEGORIES = {
       { name: 'remove', desc: 'Remove a track from the queue', usage: '!remove <position>' },
       { name: 'autoplay', desc: 'Toggle autoplay of related tracks', usage: '!autoplay' },
       { name: 'playnext', desc: 'Add a song to play next in the queue', usage: '!playnext <query>' },
+      { name: 'disconnect', desc: 'Disconnect the bot from the voice channel', usage: '!disconnect' },
     ],
   },
   platform: {
@@ -40,6 +41,7 @@ const CATEGORIES = {
       { name: 'sc', desc: 'Search and play from SoundCloud', usage: '!sc <query>' },
       { name: 'dz', desc: 'Search and play from Deezer', usage: '!dz <query>' },
       { name: 'az', desc: 'Search and play from Amazon Music', usage: '!az <query>' },
+      { name: 'js', desc: 'Search and play from JioSaavn', usage: '!js <query>' },
     ],
   },
   setup: {
@@ -51,6 +53,10 @@ const CATEGORIES = {
       { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '!setup remove' },
       { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '!largeart <on|off>' },
       { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '!source' },
+      { name: 'prefixset', desc: 'Set (overwrite) the server command prefix', usage: '!prefixset <prefix>' },
+      { name: 'prefixadd', desc: 'Add an additional server prefix', usage: '!prefixadd <prefix>' },
+      { name: 'prefixremove', desc: 'Remove a server prefix', usage: '!prefixremove <prefix>' },
+      { name: 'prefixlist', desc: 'Show all active server prefixes', usage: '!prefixlist' },
     ],
   },
   dj: {
@@ -71,16 +77,23 @@ const CATEGORIES = {
     commands: [
       { name: 'help', desc: 'Show this help menu', usage: '!help [category]' },
       { name: 'ping', desc: "Check the bot's latency", usage: '!ping' },
+      { name: 'noprefix', desc: 'Toggle your no-prefix access on/off (if granted)', usage: '!noprefix enable|disable' },
     ],
   },
 };
 
-function buildCategoryEmbed(categoryKey) {
+/**
+ * Build the category embed.
+ * @param {string} categoryKey
+ * @param {string} [guildPrefix] - Optional guild-specific prefix to display instead of '!'
+ */
+function buildCategoryEmbed(categoryKey, guildPrefix) {
   const cat = CATEGORIES[categoryKey];
   if (!cat) return null;
+  const displayPrefix = guildPrefix || '!';
 
   const fields = cat.commands.map((cmd) => ({
-    name: `\`${cmd.usage}\``,
+    name: `\`${cmd.usage.replace(/^!/, displayPrefix)}\``,
     value: cmd.desc,
     inline: false,
   }));
@@ -132,7 +145,10 @@ module.exports = {
 
   async run(client, interaction) {
     const category = interaction.options.getString('category') || 'music';
-    const embed = buildCategoryEmbed(category);
+    const { getPrefixes } = require('../../../utils/setupManager');
+    const prefixes = getPrefixes(interaction.guild?.id || '');
+    const displayPrefix = prefixes[0] || '!';
+    const embed = buildCategoryEmbed(category, displayPrefix);
     const row = buildSelectMenu(category);
 
     await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
