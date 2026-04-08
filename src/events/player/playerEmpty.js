@@ -21,16 +21,16 @@ module.exports = {
       if (lastTrack) {
         try {
           // Search for a related track using the last played track's artist + title
-          const searchQuery = `ytmsearch:${lastTrack.author || ''} ${lastTrack.title}`.trim();
+          const searchQuery = `ytmsearch:${[lastTrack.author, lastTrack.title].filter(Boolean).join(' ')}`;
           const result = await client.manager.search(searchQuery, { requester: lastTrack.requester });
           if (result && result.tracks && result.tracks.length > 0) {
+            const AUTOPLAY_CANDIDATE_POOL_SIZE = 5;
             // Prefer a track that isn't an exact duplicate
             const candidates = result.tracks.filter(
               (t) => !(t.title === lastTrack.title && t.author === lastTrack.author),
             );
-            const autoTrack = candidates.length > 0
-              ? candidates[Math.floor(Math.random() * Math.min(candidates.length, 5))]
-              : result.tracks[0];
+            const pool = candidates.length > 0 ? candidates : result.tracks;
+            const autoTrack = pool[Math.floor(Math.random() * Math.min(pool.length, AUTOPLAY_CANDIDATE_POOL_SIZE))];
             player.queue.add(autoTrack);
             await player.play();
             return; // playerStart will handle panel updates

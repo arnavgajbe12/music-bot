@@ -396,9 +396,14 @@ function buildSetupRow2DisabledV2() {
  */
 function getSquareThumbnailUrl(url) {
   if (!url) return url;
-  if (url.includes('lh3.googleusercontent.com')) {
-    // Strip any existing image-serving suffix and force a 500x500 square crop
-    return url.replace(/=[a-zA-Z0-9_\-]+$/, '') + '=w500-h500-l90-rj';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'lh3.googleusercontent.com') {
+      // Strip any existing image-serving suffix and force a 500x500 square crop
+      return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
+    }
+  } catch {
+    // Not a valid URL — return as-is
   }
   return url;
 }
