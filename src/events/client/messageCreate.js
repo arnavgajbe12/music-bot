@@ -82,7 +82,7 @@ module.exports = {
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
+            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
             { name: 'Query', value: query },
             { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
           ],
@@ -99,7 +99,7 @@ module.exports = {
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
+            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
             { name: 'Query', value: query },
             { name: 'Result Type', value: result?.type || 'null/undefined' },
           ],
