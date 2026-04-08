@@ -2,7 +2,6 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const { Kazagumo } = require('kazagumo');
 const { Connectors } = require('shoukaku');
-const { KazagumoSpotify } = require('kazagumo-spotify');
 const config = require('./config');
 
 // ─── Client Setup ──────────────────────────────────────────────────────────────
@@ -24,7 +23,7 @@ client.slashCommands = new Collection();
 const nodes = [
   {
     name: 'Main',
-    url: `${(process.env.LAVA_HOST || 'localhost').replace(/^https?:\/\/|^wss?:\/\//i, '')}:${process.env.LAVA_PORT || '2333'}`,
+    url: `${process.env.LAVA_HOST}:${process.env.LAVA_PORT}`,
     auth: process.env.LAVA_PASS,
     secure: process.env.LAVA_SECURE === 'true',
   },
@@ -34,15 +33,7 @@ const nodes = [
 client.manager = new Kazagumo(
   {
     defaultSearchengine: config.player.defaultSearchPlatform,
-    plugins: [
-      new KazagumoSpotify({
-        clientId: process.env.SPOTIFY_CLIENT_ID,
-        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-        playlistPageLimit: 1,
-        albumPageLimit: 1,
-        searchLimit: 10,
-      }),
-    ],
+    plugins: [],
   },
   new Connectors.DiscordJS(client),
   nodes,

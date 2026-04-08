@@ -197,7 +197,7 @@ module.exports = (client) => {
             const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
             const requester = track.requester;
             const requesterName = requester
-              ? requester.displayName || requester.username || 'Unknown'
+              ? requester.displayName || requester.username || requester.tag || 'Unknown'
               : 'Unknown';
 
             const infoEmbed = new EmbedBuilder()

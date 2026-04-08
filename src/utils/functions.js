@@ -64,7 +64,7 @@ async function searchWithFallback(manager, rawQuery, requester) {
     fields: [
       { name: 'Query', value: rawQuery },
       { name: 'Engines Tried', value: engines.join(', ') },
-      { name: 'Requester', value: requester?.username || String(requester?.id) || 'Unknown' },
+      { name: 'Requester', value: requester?.tag || requester?.username || String(requester?.id) || 'Unknown' },
     ],
   }).catch(() => {});
 

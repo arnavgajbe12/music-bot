@@ -16,7 +16,7 @@ module.exports = {
   async run(client, interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const voiceCheck = checkVoice(interaction.member, interaction.guild, client.manager.players.get(interaction.guild.id));
+    const voiceCheck = checkVoice(interaction.member, interaction.guild);
     if (!voiceCheck.ok) {
       return interaction.editReply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
@@ -89,7 +89,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
@@ -111,7 +111,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
@@ -142,7 +142,7 @@ module.exports = {
       player.queue.add(track);
       if (!wasIdle) {
         // Song added to an already-running queue – show "Added to Queue" Component v2
-        const queueSize = player.queue.length;
+        const queueSize = player.queue.size ?? player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
