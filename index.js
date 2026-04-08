@@ -32,7 +32,9 @@ const nodes = [
 // ─── Kazagumo (Music Manager) ───────────────────────────────────────────────────
 client.manager = new Kazagumo(
   {
-    // Valid values Kazagumo recognises: 'youtube' | 'youtube_music' | 'soundcloud'
+    // Kazagumo's defaultSearchEngine only accepts 'youtube' | 'youtube_music' | 'soundcloud'.
+    // config.player.defaultSearchPlatform holds 'ytmsearch' which Kazagumo silently ignores,
+    // so we hard-code 'youtube_music' here to get the desired ytmsearch: default.
     defaultSearchEngine: 'youtube_music',
     plugins: [],
   },
