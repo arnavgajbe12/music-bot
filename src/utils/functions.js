@@ -17,7 +17,8 @@ async function searchWithFallback(manager, rawQuery, requester) {
   if (isUrl) {
     console.log(`[searchWithFallback] URL query detected: "${rawQuery}"`);
     try {
-      const result = await manager.search(rawQuery, { requester });
+      // Pass source: '' so Kazagumo does not prepend its own search prefix to a URL
+      const result = await manager.search(rawQuery, { requester, source: '' });
       console.log(
         `[searchWithFallback] URL result → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
       );
@@ -34,7 +35,8 @@ async function searchWithFallback(manager, rawQuery, requester) {
     const queryStr = `${engine}${rawQuery}`;
     try {
       console.log(`[searchWithFallback] Trying engine "${engine}" → "${queryStr}"`);
-      const result = await manager.search(queryStr, { requester });
+      // Pass source: '' so Kazagumo does not add another prefix on top of the one we already set
+      const result = await manager.search(queryStr, { requester, source: '' });
       console.log(
         `[searchWithFallback] Result for "${engine}" → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
       );

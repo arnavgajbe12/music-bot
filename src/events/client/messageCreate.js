@@ -73,7 +73,8 @@ module.exports = {
       let result;
       try {
         console.log(`[messageCreate/setup] Searching: "${query}" for guild "${message.guild.id}"`);
-        result = await client.manager.search(query, { requester: message.author });
+        // Pass source: '' so Kazagumo does not add its own prefix on top of the one already in query
+        result = await client.manager.search(query, { requester: message.author, source: '' });
         console.log(`[messageCreate/setup] Result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
       } catch (err) {
         console.error(`[messageCreate/setup] Search threw:`, err);
@@ -82,7 +83,7 @@ module.exports = {
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
             { name: 'Query', value: query },
             { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
           ],
@@ -99,7 +100,7 @@ module.exports = {
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
             { name: 'Query', value: query },
             { name: 'Result Type', value: result?.type || 'null/undefined' },
           ],

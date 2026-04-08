@@ -32,7 +32,8 @@ module.exports = {
 
     let result;
     try {
-      result = await client.manager.search(query, { requester: message.author });
+      // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
+      result = await client.manager.search(query, { requester: message.author, source: '' });
     } catch {
       return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
     }
