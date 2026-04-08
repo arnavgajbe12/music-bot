@@ -29,27 +29,29 @@ async function searchWithFallback(manager, rawQuery, requester) {
     return null;
   }
 
-  const engines = ['ytmsearch:', 'ytsearch:', 'scsearch:'];
-  for (const engine of engines) {
-    const queryStr = `${engine}${rawQuery}`;
+  // Pass the source prefix via options.source so Kazagumo does NOT prepend its own prefix
+  // on top of the one we already specify. Passing it in the query string causes
+  // Kazagumo to produce "ytsearch:ytmsearch:query" → no results from Lavalink.
+  const sources = ['ytmsearch:', 'ytsearch:', 'scsearch:'];
+  for (const source of sources) {
     try {
-      console.log(`[searchWithFallback] Trying engine "${engine}" → "${queryStr}"`);
-      const result = await manager.search(queryStr, { requester });
+      console.log(`[searchWithFallback] Trying source "${source}" → rawQuery: "${rawQuery}"`);
+      const result = await manager.search(rawQuery, { requester, source });
       console.log(
-        `[searchWithFallback] Result for "${engine}" → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
+        `[searchWithFallback] Result for "${source}" → type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`,
       );
       if (result && result.tracks && result.tracks.length > 0) {
-        console.log(`[searchWithFallback] ✅ Found ${result.tracks.length} track(s) via "${engine}"`);
+        console.log(`[searchWithFallback] ✅ Found ${result.tracks.length} track(s) via "${source}"`);
         return result;
       }
     } catch (err) {
-      console.error(`[searchWithFallback] Engine "${engine}" threw:`, err?.message || err);
+      console.error(`[searchWithFallback] Source "${source}" threw:`, err?.message || err);
       // Log failures to webhook so we can diagnose remote Lavalink issues
       await logToWebhook({
         title: '⚠️ Search Engine Exception',
         color: 0xffa500,
         fields: [
-          { name: 'Engine', value: engine, inline: true },
+          { name: 'Source', value: source, inline: true },
           { name: 'Query', value: rawQuery, inline: true },
           { name: 'Error', value: String(err?.message || err) },
         ],
@@ -57,14 +59,14 @@ async function searchWithFallback(manager, rawQuery, requester) {
     }
   }
 
-  console.warn(`[searchWithFallback] ❌ All engines exhausted – no results for: "${rawQuery}"`);
+  console.warn(`[searchWithFallback] ❌ All sources exhausted – no results for: "${rawQuery}"`);
   await logToWebhook({
     title: '❌ Search – No Results from Any Engine',
     color: 0xed4245,
     fields: [
       { name: 'Query', value: rawQuery },
-      { name: 'Engines Tried', value: engines.join(', ') },
-      { name: 'Requester', value: requester?.tag || requester?.username || String(requester?.id) || 'Unknown' },
+      { name: 'Sources Tried', value: sources.join(', ') },
+      { name: 'Requester', value: requester?.username || requester?.tag || String(requester?.id) || 'Unknown' },
     ],
   }).catch(() => {});
 

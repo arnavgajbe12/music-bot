@@ -36,18 +36,23 @@ module.exports = {
       if (!content) return;
 
       // Check for platform prefix (e.g. "yt Blinding Lights")
-      let query;
+      let searchQuery = content;
+      let searchSource;
       const firstWord = content.split(/\s+/)[0].toLowerCase();
       const rest = content.split(/\s+/).slice(1).join(' ').trim();
       if (PLATFORM_PREFIXES[firstWord] && rest) {
-        query = `${PLATFORM_PREFIXES[firstWord]}${rest}`;
+        // e.g. "yt Blinding Lights" → source='ytsearch:', query='Blinding Lights'
+        searchSource = PLATFORM_PREFIXES[firstWord];
+        searchQuery = rest;
       } else if (/^https?:\/\//i.test(content)) {
-        query = content;
+        // Direct URL — pass through without a source prefix
+        searchQuery = content;
+        searchSource = undefined;
       } else {
         // Use the guild's stored playback source, or fall back to config default
         const guildSettings = getSettings(message.guild.id);
-        const searchPrefix = guildSettings.playbackSource || `${config.player.defaultSearchPlatform}:`;
-        query = `${searchPrefix}${content}`;
+        searchSource = guildSettings.playbackSource || `${config.player.defaultSearchPlatform}:`;
+        searchQuery = content;
       }
 
       let player = client.manager.players.get(message.guild.id);
@@ -72,8 +77,9 @@ module.exports = {
 
       let result;
       try {
-        console.log(`[messageCreate/setup] Searching: "${query}" for guild "${message.guild.id}"`);
-        result = await client.manager.search(query, { requester: message.author });
+        console.log(`[messageCreate/setup] Searching: source="${searchSource || 'none'}" query="${searchQuery}" for guild "${message.guild.id}"`);
+        // Pass source via options so Kazagumo doesn't double-prefix (it would otherwise prepend 'ytsearch:' on top of our prefix)
+        result = await client.manager.search(searchQuery, { requester: message.author, source: searchSource });
         console.log(`[messageCreate/setup] Result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
       } catch (err) {
         console.error(`[messageCreate/setup] Search threw:`, err);
@@ -82,8 +88,8 @@ module.exports = {
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
-            { name: 'Query', value: query },
+            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
+            { name: 'Query', value: searchQuery },
             { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
           ],
         }).catch(() => {});
@@ -93,14 +99,14 @@ module.exports = {
       }
 
       if (!result || !result.tracks.length) {
-        console.warn(`[messageCreate/setup] No results for: "${query}"`);
+        console.warn(`[messageCreate/setup] No results for: source="${searchSource}" query="${searchQuery}"`);
         logToWebhook({
           title: '❌ Setup Channel – No Results',
           color: 0xed4245,
           fields: [
             { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
-            { name: 'Query', value: query },
+            { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
+            { name: 'Query', value: searchQuery },
             { name: 'Result Type', value: result?.type || 'null/undefined' },
           ],
         }).catch(() => {});
