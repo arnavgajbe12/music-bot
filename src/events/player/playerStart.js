@@ -12,6 +12,12 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
+    // Extract dominant color once, reuse for all panels
+    const artUrl = track.thumbnail || track.artworkUrl || null;
+    const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
+    player.data.set('accentColor', accentColor);
+    player.data.set('setupQueueView', false);
+
     // ── Setup channel panel edit ─────────────────────────────────────────────
     if (setupInfo) {
       try {
@@ -20,12 +26,6 @@ module.exports = {
           try {
             const setupMsg = await setupChannel.messages.fetch(setupInfo.messageId);
             if (setupMsg?.editable) {
-              // Extract dominant color from the thumbnail asynchronously
-              const artUrl = track.thumbnail || track.artworkUrl || null;
-              const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
-              // Cache accent color and reset queue view when a new track starts
-              player.data.set('accentColor', accentColor);
-              player.data.set('setupQueueView', false);
               const payload = buildSetupNowPlayingV2(track, player, accentColor);
               await setupMsg.edit(payload);
               player.data.set('nowPlayingMessage', setupMsg);
@@ -33,6 +33,24 @@ module.exports = {
             }
           } catch {
             // Panel message was deleted – fall through to text channel
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    // ── Control message update (portable /control panel) ─────────────────────
+    const controlMsgId = player.data.get('controlMessageId');
+    const controlChannelId = player.data.get('controlMessageChannelId');
+    if (controlMsgId && controlChannelId) {
+      try {
+        const controlChannel = client.channels.cache.get(controlChannelId);
+        if (controlChannel?.isTextBased()) {
+          const controlMsg = await controlChannel.messages.fetch(controlMsgId).catch(() => null);
+          if (controlMsg?.editable) {
+            const payload = buildSetupNowPlayingV2(track, player, accentColor);
+            await controlMsg.edit(payload).catch(() => {});
           }
         }
       } catch {

@@ -17,6 +17,14 @@ module.exports = {
     const voiceChannel = message.member.voice.channel;
 
     let player = client.manager.players.get(message.guild.id);
+
+    // If a player exists but bot was manually kicked from VC, destroy the stale player
+    const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
+    if (player && !botVoiceChannelId) {
+      await player.destroy().catch(() => {});
+      player = null;
+    }
+
     if (player && player.voiceId === voiceChannel.id) {
       return message.reply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
     }

@@ -24,6 +24,14 @@ module.exports = {
     const voiceChannel = interaction.member.voice.channel;
 
     let player = client.manager.players.get(interaction.guild.id);
+
+    // If a player exists but the bot was manually disconnected from VC, destroy it so we can rejoin
+    const botVoiceChannelId = interaction.guild.members.me?.voice?.channelId;
+    if (player && !botVoiceChannelId) {
+      await player.destroy().catch(() => {});
+      player = null;
+    }
+
     if (!player) {
       player = await client.manager.createPlayer({
         guildId: interaction.guild.id,

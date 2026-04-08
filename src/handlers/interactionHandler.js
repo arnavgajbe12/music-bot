@@ -162,8 +162,11 @@ module.exports = (client) => {
             try {
               const settings = getSettings(interaction.guild.id);
               const setupInfo = getSetup(interaction.guild.id);
+              const controlMsgId = player.data.get('controlMessageId');
+              const isSetupMsg = setupInfo && interaction.message?.id === setupInfo.messageId;
+              const isControlMsg = controlMsgId && interaction.message?.id === controlMsgId;
               let payload;
-              if (setupInfo && interaction.message?.id === setupInfo.messageId) {
+              if (isSetupMsg || isControlMsg) {
                 const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
                 const accentColor = await resolveAccentColor(player, artUrl);
                 payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
@@ -290,9 +293,12 @@ module.exports = (client) => {
       // ── Setup channel queue view navigation ────────────────────────────────
       if (customId.startsWith('setup_queue_nav:')) {
         const setupInfo = getSetup(guild.id);
-        if (!setupInfo || interaction.message.id !== setupInfo.messageId) return interaction.deferUpdate().catch(() => {});
-
         const player = client.manager.players.get(guild.id);
+        const controlMsgId = player?.data?.get('controlMessageId');
+        const isSetupMsg = setupInfo && interaction.message.id === setupInfo.messageId;
+        const isControlMsg = controlMsgId && interaction.message.id === controlMsgId;
+        if (!isSetupMsg && !isControlMsg) return interaction.deferUpdate().catch(() => {});
+
         if (!player || !player.queue.current) {
           return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
         }
@@ -310,11 +316,14 @@ module.exports = (client) => {
       const setupRow2Ids = ['setup_queue', 'setup_shuffle', 'setup_vol_down', 'setup_vol_up'];
       if (setupRow2Ids.includes(customId)) {
         const setupInfo = getSetup(guild.id);
-        if (!setupInfo || interaction.message.id !== setupInfo.messageId) {
+        const player = client.manager.players.get(guild.id);
+        const controlMsgId = player?.data?.get('controlMessageId');
+        const isSetupMsg = setupInfo && interaction.message.id === setupInfo.messageId;
+        const isControlMsg = controlMsgId && interaction.message.id === controlMsgId;
+        if (!isSetupMsg && !isControlMsg) {
           return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
         }
 
-        const player = client.manager.players.get(guild.id);
         if (!player) {
           return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
         }
@@ -444,10 +453,14 @@ module.exports = (client) => {
         if (interaction.message?.editable && player.queue.current) {
           const settings = getSettings(guild.id);
           const setupInfo = getSetup(guild.id);
+          const controlMsgId = player.data.get('controlMessageId');
 
           let payload;
-          if (setupInfo && interaction.message.id === setupInfo.messageId) {
-            // Setup channel panel — respect current view mode
+          const isSetupMsg = setupInfo && interaction.message.id === setupInfo.messageId;
+          const isControlMsg = controlMsgId && interaction.message.id === controlMsgId;
+
+          if (isSetupMsg || isControlMsg) {
+            // Setup channel or control panel — respect current view mode
             const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
             const accentColor = await resolveAccentColor(player, artUrl);
             const isQueueView = player.data.get('setupQueueView') === true;
