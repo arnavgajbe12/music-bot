@@ -34,7 +34,7 @@ module.exports = {
     }
 
     const target = tracks[num - 1];
-    // Move target to front of queue
+    // Move target track to front of queue, then skip to it
     player.queue.splice(num - 1, 1);
     player.queue.unshift(target);
 

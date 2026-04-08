@@ -270,7 +270,7 @@ module.exports = (client) => {
           });
         }
 
-        const val = interaction.values[0]; // format: "rec:<i>:<uri>"
+        const val = interaction.values[0]; // format: "rec:<i>"
         const recommendations = player.data.get('setupRecommendations') || [];
         const parts = val.split(':');
         const recIdx = parseInt(parts[1], 10);
@@ -400,9 +400,15 @@ module.exports = (client) => {
               const searchQuery = `ytmsearch:${[currentTrack.author, currentTrack.title].filter(Boolean).join(' ')}`;
               const recResult = await client.manager.search(searchQuery, { requester: currentTrack.requester, source: '' });
               if (recResult && recResult.tracks && recResult.tracks.length > 0) {
-                // Filter out the current song, take up to 10
+                // Filter out the current song (case-insensitive comparison), take up to 10
+                const currentTitle = (currentTrack.title || '').toLowerCase().trim();
+                const currentAuthor = (currentTrack.author || '').toLowerCase().trim();
                 recommendations = recResult.tracks
-                  .filter((t) => !(t.title === currentTrack.title && t.author === currentTrack.author))
+                  .filter((t) => {
+                    const tTitle = (t.title || '').toLowerCase().trim();
+                    const tAuthor = (t.author || '').toLowerCase().trim();
+                    return !(tTitle === currentTitle && tAuthor === currentAuthor);
+                  })
                   .slice(0, 10);
               }
             } catch {

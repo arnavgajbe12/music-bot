@@ -5,16 +5,8 @@ const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
 
-// Map of source option values to Lavalink search prefixes
-const SOURCE_PREFIXES = {
-  ytmsearch: 'ytmsearch:',
-  ytsearch: 'ytsearch:',
-  scsearch: 'scsearch:',
-  spsearch: 'spsearch:',
-  jssearch: 'jssearch:',
-  amsearch: 'amsearch:',
-  dzsearch: 'dzsearch:',
-};
+// Allowed search-prefix values to prevent injection of arbitrary Lavalink prefixes
+const ALLOWED_SOURCES = new Set(['ytmsearch', 'ytsearch', 'scsearch', 'spsearch', 'jssearch', 'amsearch', 'dzsearch']);
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -92,7 +84,8 @@ module.exports = {
     // Use source option (if provided) → per-guild source → fallback chain
     const settings = getSettings(interaction.guild.id);
     const sourceOption = interaction.options.getString('source');
-    const selectedPrefix = sourceOption ? SOURCE_PREFIXES[sourceOption] : null;
+    // Build the search prefix: colon is appended to the option value (e.g. 'ytmsearch' → 'ytmsearch:')
+    const selectedPrefix = sourceOption && ALLOWED_SOURCES.has(sourceOption) ? `${sourceOption}:` : null;
     const effectivePrefix = selectedPrefix || settings.playbackSource || null;
 
     let result;

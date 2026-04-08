@@ -29,10 +29,9 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed(`There are only **${tracks.length}** track(s) in the queue after the current song.`)] });
     }
 
-    // Remove tracks before the target and unshift them (skip over them)
+    // Move the target track to the front of the queue, then skip to it
     // tracks[0] is the next song (position 1), tracks[num-1] is the target
     const target = tracks[num - 1];
-    // Move target to the front of the queue
     player.queue.splice(num - 1, 1);
     player.queue.unshift(target);
 

@@ -679,7 +679,8 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
       return new StringSelectMenuOptionBuilder()
         .setLabel(label)
         .setDescription(desc)
-        .setValue(`rec:${i}:${encodeURIComponent((t.uri || t.title || '').slice(0, 80))}`);
+        // Only the index is needed — track is retrieved from player.data.get('setupRecommendations')[i]
+        .setValue(`rec:${i}`);
     });
 
     container.addActionRowComponents(
