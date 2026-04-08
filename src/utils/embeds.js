@@ -117,7 +117,7 @@ function buildNowPlayingEmbed(track, player, platformEmoji) {
       { name: `${emoji} Source`, value: sourceDisplay, inline: true },
       { name: '👤 Requested By', value: requesterTag, inline: true },
       { name: '🔊 Volume', value: `${player.volume}%`, inline: true },
-      { name: '📋 Up Next', value: player.queue.size > 0 ? `${player.queue.size} track(s)` : 'Nothing', inline: true },
+      { name: '📋 Up Next', value: player.queue.length > 0 ? `${player.queue.length} track(s)` : 'Nothing', inline: true },
     )
     .setThumbnail(thumbnail)
     .setFooter({ text: config.embeds.footerText })

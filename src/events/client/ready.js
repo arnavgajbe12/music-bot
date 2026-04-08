@@ -3,7 +3,7 @@ const { REST, Routes } = require('discord.js');
 module.exports = {
   once: true,
   async run(client) {
-    console.log(`[Ready] Logged in as ${client.user.tag}`);
+    console.log(`[Ready] Logged in as ${client.user.username}`);
     client.user.setPresence({
       activities: [{ name: '🎵 Music | Use /play', type: 2 }],
       status: 'online',

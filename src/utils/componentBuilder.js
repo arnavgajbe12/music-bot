@@ -172,7 +172,7 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const requester = track.requester;
   const requesterName = requester
-    ? requester.displayName || requester.username || requester.tag || 'Unknown'
+    ? requester.displayName || requester.username || 'Unknown'
     : 'Unknown';
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
 
@@ -624,7 +624,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const requester = track.requester;
   const requesterName = requester
-    ? requester.displayName || requester.username || requester.tag || 'Unknown'
+    ? requester.displayName || requester.username || 'Unknown'
     : 'Unknown';
   const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
 

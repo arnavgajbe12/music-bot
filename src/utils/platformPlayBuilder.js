@@ -22,7 +22,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
     async run(client, interaction) {
       await interaction.deferReply({ ephemeral: true });
 
-      const voiceCheck = checkVoice(interaction.member, interaction.guild);
+      const voiceCheck = checkVoice(interaction.member, interaction.guild, client.manager.players.get(interaction.guild.id));
       if (!voiceCheck.ok) {
         return interaction.editReply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
       }
@@ -88,7 +88,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
         const track = result.tracks[0];
         player.queue.add(track);
         if (!wasIdle) {
-          const queueSize = player.queue.size ?? player.queue.length;
+          const queueSize = player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
           await interaction.editReply(payload);
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
@@ -122,7 +122,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         return message.reply({ embeds: [buildErrorEmbed(`Please provide a song name to search on ${platformLabel}.`)] });
       }
 
-      const voiceCheck = checkVoice(message.member, message.guild);
+      const voiceCheck = checkVoice(message.member, message.guild, client.manager.players.get(message.guild.id));
       if (!voiceCheck.ok) {
         return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
       }
@@ -190,7 +190,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         const track = result.tracks[0];
         player.queue.add(track);
         if (!wasIdle) {
-          const queueSize = player.queue.size ?? player.queue.length;
+          const queueSize = player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
           const reply = await message.reply(payload);
           setTimeout(() => reply.delete().catch(() => {}), 15000);

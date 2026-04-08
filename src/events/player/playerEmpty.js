@@ -17,9 +17,8 @@ module.exports = {
 
     // ── Autoplay: enqueue a related track when queue runs out ────────────────
     if (settings.autoplay) {
-      const lastTrack = Array.isArray(player.queue.previous) && player.queue.previous.length > 0
-        ? player.queue.previous[0]
-        : null;
+      const prev = player.queue.previous;
+      const lastTrack = Array.isArray(prev) ? (prev[0] ?? null) : (prev ?? null);
 
       if (lastTrack) {
         try {
@@ -101,7 +100,7 @@ module.exports = {
 
     if (config.player.leaveOnEmpty) {
       setTimeout(() => {
-        if (!player.playing && player.queue.size === 0) {
+        if (!player.playing && player.queue.length === 0) {
           player.destroy().catch(() => {});
         }
       }, 5000);

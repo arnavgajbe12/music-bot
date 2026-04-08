@@ -1,12 +1,12 @@
 module.exports = {
   botSetup: {
     prefix: '!',
-    devs: ['YOUR_DISCORD_USER_ID_HERE'],
+    devs: process.env.DEV_IDS ? process.env.DEV_IDS.split(',').map((id) => id.trim()) : [],
   },
 
   logs: {
-    lavalinkLogChannel: 'YOUR_LAVALINK_LOG_CHANNEL_ID',
-    commandLogChannel: 'YOUR_COMMAND_LOG_CHANNEL_ID',
+    lavalinkLogChannel: process.env.LAVALINK_LOG_CHANNEL_ID || null,
+    commandLogChannel: process.env.COMMAND_LOG_CHANNEL_ID || null,
   },
 
   player: {
@@ -48,12 +48,14 @@ module.exports = {
   },
 
   images: {
-    nowPlayingBanner: 'https://i.imgur.com/your-banner.png',
-    defaultThumbnail: 'https://i.imgur.com/your-thumbnail.png',
+    nowPlayingBanner: process.env.NOW_PLAYING_BANNER_URL || null,
+    defaultThumbnail: process.env.DEFAULT_THUMBNAIL_URL || 'https://i.imgur.com/AfFp7pu.png',
   },
 
   links: {
-    invite: 'https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands',
-    supportServer: 'https://discord.gg/your-server',
+    invite: process.env.CLIENT_ID
+      ? `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`
+      : null,
+    supportServer: process.env.SUPPORT_SERVER_INVITE || null,
   },
 };
