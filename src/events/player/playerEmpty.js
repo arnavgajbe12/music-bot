@@ -17,15 +17,15 @@ module.exports = {
 
     // ── Autoplay: enqueue a related track when queue runs out ────────────────
     if (settings.autoplay) {
-      const lastTrack = Array.isArray(player.queue.previous) && player.queue.previous.length > 0
-        ? player.queue.previous[0]
-        : null;
+      // player.queue.previous is an Array (most recent first) in Kazagumo 3.x
+      const lastTrack = player.queue.previous.length > 0 ? player.queue.previous[0] : null;
 
       if (lastTrack) {
         try {
           // Search for a related track using the last played track's artist + title
           const searchQuery = `ytmsearch:${[lastTrack.author, lastTrack.title].filter(Boolean).join(' ')}`;
-          const result = await client.manager.search(searchQuery, { requester: lastTrack.requester });
+          // Pass source: '' so Kazagumo does not prepend its own prefix on top of the one we set
+          const result = await client.manager.search(searchQuery, { requester: lastTrack.requester, source: '' });
           if (result && result.tracks && result.tracks.length > 0) {
             const AUTOPLAY_CANDIDATE_POOL_SIZE = 5;
             // Prefer a track that isn't an exact duplicate

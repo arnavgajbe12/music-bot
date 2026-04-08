@@ -63,7 +63,8 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
 
       let result;
       try {
-        result = await client.manager.search(query, { requester: interaction.user });
+        // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
+        result = await client.manager.search(query, { requester: interaction.user, source: '' });
       } catch {
         return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
       }
@@ -164,7 +165,8 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
 
       let result;
       try {
-        result = await client.manager.search(query, { requester: message.author });
+        // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
+        result = await client.manager.search(query, { requester: message.author, source: '' });
       } catch (error) {
         console.error(`[prefix ${name}] Search error:`, error);
         return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });

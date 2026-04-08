@@ -71,7 +71,8 @@ module.exports = {
         const isUrl = /^https?:\/\//i.test(rawQuery);
         const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
         console.log(`[slash play] Searching with guild source "${settings.playbackSource}" → query: "${query}"`);
-        result = await client.manager.search(query, { requester: interaction.user });
+        // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
+        result = await client.manager.search(query, { requester: interaction.user, source: '' });
         console.log(`[slash play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
         // If no tracks found with configured source, fall back to the default chain
         if (!result || !result.tracks.length) {
@@ -89,7 +90,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
@@ -111,7 +112,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
