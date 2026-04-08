@@ -384,67 +384,84 @@ function buildSetupRow2DisabledV2() {
   );
 }
 
+// ─── Square Thumbnail Helper ────────────────────────────────────────────────────
+
+/**
+ * Attempt to return a 1:1 square thumbnail URL.
+ * For YouTube Music thumbnails hosted on lh3.googleusercontent.com, appends
+ * the =w500-h500-l90-rj resize parameter to get a square crop.
+ * For all other URLs the original URL is returned unchanged.
+ * @param {string} url - Original thumbnail URL
+ * @returns {string} Possibly-modified URL
+ */
+function getSquareThumbnailUrl(url) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'lh3.googleusercontent.com') {
+      // Strip any existing image-serving suffix and force a 500x500 square crop
+      return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
+    }
+  } catch {
+    // Not a valid URL — return as-is
+  }
+  return url;
+}
+
 /**
  * Build the Setup Channel Now Playing Component v2 panel.
- * This is the permanent panel in the song-request channel.
  *
  * Layout:
  *  - Dynamic accent color (extracted from thumbnail, random on failure)
- *  - Header (medium text): Emoji Source Name - [Song Title](URL)
- *  - Large image: track thumbnail
- *  - Body (large text): ## Song Title  (no link)
- *  - Subtext: Artist • Duration
+ *  - Large image: track thumbnail (square-cropped when possible)
+ *  - ### ♪  [Song Title]
+ *  - [Artist]
+ *  - -# [Total Length]  (or -# [Progress] / [Total Length] when paused)
  *  - Separator
- *  - Row 1: ⏮️ Previous | ⏯️ Pause | ⏭️ Skip | ⏹️ Stop
- *  - Row 2: 🎛️ Queue | 🔀 Shuffle | 🔉 Vol Down | 🔊 Vol Up
- *
- * NOTE: No user pings anywhere.
+ *  - Row 1: Prev | Pause | Skip | Stop
+ *  - Row 2: Queue | Shuffle | Vol Down | Vol Up
  *
  * @param {object} track  - KazagumoTrack
  * @param {object} player - KazagumoPlayer
- * @param {number} [accentColor] - Pre-computed accent color (integer). If omitted
- *   the function will attempt extraction asynchronously — caller should pass the
- *   result of `extractDominantColor` to avoid blocking.
+ * @param {number} [accentColor] - Pre-computed accent color (integer).
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
 function buildSetupNowPlayingV2(track, player, accentColor) {
-  const platformEmoji = resolvePlatformEmoji(track.sourceName);
-  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
-  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
-  const trackUrl = track.uri || null;
-
-  // Clickable header: 🔴 YouTube Music - [Blinding Lights](https://...)
-  const headerText = trackUrl
-    ? `${platformEmoji} ${sourceDisplay} - [${track.title}](${trackUrl})`
-    : `${platformEmoji} ${sourceDisplay} - ${track.title}`;
+  const artUrl = getSquareThumbnailUrl(track.thumbnail || track.artworkUrl || config.images.defaultThumbnail);
 
   const container = new ContainerBuilder();
 
   // Apply accent color (left color stripe)
-  const color =
-    accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
+  const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Small clickable header line
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(headerText),
-  );
-
-  // Large thumbnail image
+  // Large square thumbnail image
   container.addMediaGalleryComponents(
     new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
   );
 
-  // Large song title (## = large text, no link)
+  // ### ♪  Song Title
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${track.title}`),
+    new TextDisplayBuilder().setContent(`### ${config.emojis.music}  ${track.title}`),
   );
 
-  // Artist • Duration subtext
+  // Artist name
   const artist = track.author || 'Unknown Artist';
-  const duration = formatDuration(track.length);
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`${artist} • ${duration}`),
+    new TextDisplayBuilder().setContent(artist),
+  );
+
+  // -# Duration (or Progress / Duration when paused)
+  const totalDuration = formatDuration(track.length);
+  let durationLine;
+  if (player.paused && player.position > 0) {
+    const progress = formatDuration(player.position);
+    durationLine = `-# ${progress} / ${totalDuration}`;
+  } else {
+    durationLine = `-# ${totalDuration}`;
+  }
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(durationLine),
   );
 
   container.addSeparatorComponents(new SeparatorBuilder());
@@ -497,9 +514,8 @@ const SETUP_QUEUE_PAGE_SIZE = 4;
 
 /**
  * Build the Setup Channel Queue Toggle View.
- * Replaces the large image with a 5-song list (1 current + 4 upcoming).
- * The Queue button (Row 2) is highlighted green while in this view.
- * Navigation buttons (⬆️ / ⬇️) are added above the control rows.
+ * Shows current + upcoming tracks with small square thumbnail.
+ * Navigation buttons (⬆️ / ⬇️) are at the TOP of the panel.
  *
  * @param {object} currentTrack - KazagumoTrack (currently playing)
  * @param {object[]} tracks     - Upcoming tracks array
@@ -518,59 +534,73 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Current track header
-  const currentEmoji = resolvePlatformEmoji(currentTrack.sourceName);
-  const currentArtUrl = currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail;
-  const currentTrackUrl = currentTrack.uri || null;
-  const currentTitle = currentTrackUrl
-    ? `[${currentTrack.title}](${currentTrackUrl})`
-    : currentTrack.title;
-
-  // Section: current track with small thumbnail accessory
-  const section = new SectionBuilder()
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `▶️ **Now Playing**\n${currentEmoji} **${currentTitle}**\n${currentTrack.author || 'Unknown'} • ${formatDuration(currentTrack.length)}`,
-      ),
-    )
-    .setThumbnailAccessory(new ThumbnailBuilder().setURL(currentArtUrl));
-  container.addSectionComponents(section);
-
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  // Upcoming tracks list
-  const trackListText = pageTracks.length
-    ? pageTracks
-        .map((t, i) => {
-          const emoji = resolvePlatformEmoji(t.sourceName);
-          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
-        })
-        .join('\n')
-    : '*No upcoming tracks.*';
-
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackListText));
-
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  // Navigation row (⬆️ Prev page / ⬇️ Next page)
+  // Navigation row at the TOP (per user request)
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`setup_queue_nav:${clampedPage - 1}`)
-        .setEmoji('⬆️')
+        .setEmoji('\u2b06\ufe0f')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(clampedPage <= 1),
       new ButtonBuilder()
         .setCustomId(`setup_queue_nav:${clampedPage + 1}`)
-        .setEmoji('⬇️')
+        .setEmoji('\u2b07\ufe0f')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(clampedPage >= totalPages),
     ),
   );
 
-  // Control Row 1 (Previous, Pause, Skip, Stop) — always visible
+  // Header: QUEUE\u30023 songs
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`QUEUE・${tracks.length} song${tracks.length !== 1 ? 's' : ''}`),
+  );
+
+  // Current track section with small square thumbnail accessory
+  const currentArtUrl = getSquareThumbnailUrl(currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail);
+
+  // Duration line for current track: -# total or -# progress / total when paused
+  const currentTotalDur = formatDuration(currentTrack.length);
+  let currentDurLine;
+  if (player.paused && player.position > 0) {
+    currentDurLine = `-# ${formatDuration(player.position)} / ${currentTotalDur}`;
+  } else {
+    currentDurLine = `-# ${currentTotalDur}`;
+  }
+
+  const currentTrackText =
+    `### \u25b6\ufe0f  ${currentTrack.title}\n` +
+    `${currentTrack.author || 'Unknown'}\n` +
+    currentDurLine;
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(currentTrackText))
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(currentArtUrl));
+  container.addSectionComponents(section);
+
+  // Upcoming tracks list with requester mentions
+  if (pageTracks.length > 0) {
+    const trackLines = pageTracks.map((t, i) => {
+      const globalIdx = start + i + 1;
+      const paddedIdx = String(globalIdx).padStart(2, '0');
+      const requesterId = t.requester?.id || null;
+      const requesterStr = requesterId ? `<@${requesterId}>` : 'Unknown';
+      const titleStr = `**${t.title}** - ${t.author || 'Unknown'}`;
+      return `🟢-# \`${paddedIdx}\`・${requesterStr}\n${titleStr}`;
+    });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(trackLines.join('\n')),
+    );
+  } else {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('*No upcoming tracks.*'),
+    );
+  }
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Control Row 1 (Previous, Pause, Skip, Stop)
   container.addActionRowComponents(buildSetupButtonsV2(player));
-  // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up) — always visible
+  // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up)
   container.addActionRowComponents(buildSetupRow2V2(true));
 
   return {
@@ -943,6 +973,7 @@ module.exports = {
   buildSetupRow2DisabledV2,
   buildSetupQueueViewV2,
   extractDominantColor,
+  getSquareThumbnailUrl,
   buildQueueV2,
   buildQueueStandaloneV2,
   buildPlayNextConfirmV2,

@@ -25,6 +25,14 @@ module.exports = {
     await message.channel.sendTyping();
 
     let player = client.manager.players.get(message.guild.id);
+
+    // If a player exists but the bot was manually disconnected from VC, destroy it so we can rejoin
+    const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
+    if (player && !botVoiceChannelId) {
+      await player.destroy().catch(() => {});
+      player = null;
+    }
+
     if (!player) {
       player = await client.manager.createPlayer({
         guildId: message.guild.id,

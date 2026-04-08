@@ -19,6 +19,14 @@ module.exports = {
     const voiceChannel = interaction.member.voice.channel;
 
     let player = client.manager.players.get(interaction.guild.id);
+
+    // If a player exists but bot was manually kicked from VC, destroy the stale player
+    const botVoiceChannelId = interaction.guild.members.me?.voice?.channelId;
+    if (player && !botVoiceChannelId) {
+      await player.destroy().catch(() => {});
+      player = null;
+    }
+
     if (player && player.voiceId === voiceChannel.id) {
       return interaction.editReply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
     }
