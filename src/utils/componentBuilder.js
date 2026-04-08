@@ -483,7 +483,7 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   const artist = track.author || 'Unknown Artist';
   const total = track.length || 0;
   const position = player.position || 0;
-  const durationLine = player.paused && position > 0
+  const durationLine = position > 0
     ? `-# ${formatDuration(position)} / ${formatDuration(total)}`
     : `-# ${formatDuration(total)}`;
 
@@ -567,10 +567,10 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Duration for the current track (show progress/total when paused)
+  // Duration for the current track (show progress/total when position > 0)
   const total = currentTrack.length || 0;
   const position = player?.position || 0;
-  const durationLine = player?.paused && position > 0
+  const durationLine = position > 0
     ? `-# ${formatDuration(position)} / ${formatDuration(total)}`
     : `-# ${formatDuration(total)}`;
 
