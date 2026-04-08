@@ -4,7 +4,7 @@ const config = require('../../../../config');
 
 module.exports = {
   name: 'stop',
-  aliases: ['dc', 'disconnect'],
+  aliases: [],
   description: 'Stop the music and clear the queue.',
   usage: '',
 

@@ -161,6 +161,16 @@ function buildMoreOptionsDropdown() {
 // ─── Component v2 Panel Builders ──────────────────────────────────────────────
 
 /**
+ * Determine whether to show a track's thumbnail as 1:1 (YouTube Music) or 16:9 (others).
+ * Returns 'square' for YouTube Music, 'wide' for everything else.
+ * @param {string} sourceName
+ * @returns {'square'|'wide'}
+ */
+function getThumbnailDisplayMode(sourceName) {
+  return (sourceName || '').toLowerCase() === 'youtubemusic' ? 'square' : 'wide';
+}
+
+/**
  * Build the Now Playing Component v2 message payload.
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
@@ -174,7 +184,9 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
   // Dynamic small status line shown above the (large) song title
   const isPaused = player.paused;
@@ -184,6 +196,10 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     : `${platformEmoji} **Now Playing**${loopMode}`;
 
   const container = new ContainerBuilder();
+
+  // Apply dynamic accent color if available
+  const accentColor = player.data?.get('accentColor');
+  if (accentColor != null) container.setAccentColor(accentColor);
 
   // Small dynamic status header
   container.addTextDisplayComponents(
@@ -198,13 +214,21 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     `👤  ${requesterName}`;
 
   if (largeArt) {
-    // Large album art as gallery
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-    );
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
+    if (isYTM) {
+      // YouTube Music: 1:1 square thumbnail as section accessory
+      const section = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+      container.addSectionComponents(section);
+    } else {
+      // YouTube/other: 16:9 gallery image
+      container.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+      );
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
+    }
   } else {
-    // Small thumbnail in a section accessory
+    // Small thumbnail in a section accessory (always 1:1 in this mode)
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
@@ -413,7 +437,8 @@ function getSquareThumbnailUrl(url) {
  *
  * Layout:
  *  - Dynamic accent color (extracted from thumbnail, random on failure)
- *  - Large image: track thumbnail (square-cropped when possible)
+ *  - TextDisplay: 🎵 Now Playing + -# [Song Title hyperlink]  (header — item 5)
+ *  - Thumbnail: 1:1 square for YouTube Music, 16:9 gallery for others  (item 2)
  *  - ### ♪  [Song Title]
  *  - [Artist]
  *  - -# [Total Length]  (or -# [Progress] / [Total Length] when paused)
@@ -427,7 +452,9 @@ function getSquareThumbnailUrl(url) {
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
 function buildSetupNowPlayingV2(track, player, accentColor) {
-  const artUrl = getSquareThumbnailUrl(track.thumbnail || track.artworkUrl || config.images.defaultThumbnail);
+  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
   const container = new ContainerBuilder();
 
@@ -435,34 +462,59 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Large square thumbnail image
-  container.addMediaGalleryComponents(
-    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-  );
-
-  // ### ♪  Song Title
+  // ── Header: "Now Playing" emoji + song title as hyperlink (item 5) ──────────
+  const titleLink = track.uri ? `[${track.title}](${track.uri})` : track.title;
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`### ${config.emojis.music}  ${track.title}`),
+    new TextDisplayBuilder().setContent(`${config.emojis.music} **Now Playing**\n-# ${titleLink}`),
   );
 
-  // Artist name
-  const artist = track.author || 'Unknown Artist';
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(artist),
-  );
-
-  // -# Duration (or Progress / Duration when paused)
-  const totalDuration = formatDuration(track.length);
-  let durationLine;
-  if (player.paused && player.position > 0) {
-    const progress = formatDuration(player.position);
-    durationLine = `-# ${progress} / ${totalDuration}`;
+  // ── Thumbnail: 1:1 for YouTube Music, 16:9 gallery for others (item 2) ──────
+  if (isYTM) {
+    // YouTube Music: section with 1:1 thumbnail accessory
+    const artist = track.author || 'Unknown Artist';
+    const totalDuration = formatDuration(track.length);
+    let durationLine;
+    if (player.paused && player.position > 0) {
+      const progress = formatDuration(player.position);
+      durationLine = `-# ${progress} / ${totalDuration}`;
+    } else {
+      durationLine = `-# ${totalDuration}`;
+    }
+    const trackText = `### ${config.emojis.music}  ${track.title}\n${artist}\n${durationLine}`;
+    const section = new SectionBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(trackText))
+      .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+    container.addSectionComponents(section);
   } else {
-    durationLine = `-# ${totalDuration}`;
+    // YouTube/other: 16:9 gallery image
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+
+    // ### ♪  Song Title
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`### ${config.emojis.music}  ${track.title}`),
+    );
+
+    // Artist name
+    const artist = track.author || 'Unknown Artist';
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(artist),
+    );
+
+    // -# Duration (or Progress / Duration when paused)
+    const totalDuration = formatDuration(track.length);
+    let durationLine;
+    if (player.paused && player.position > 0) {
+      const progress = formatDuration(player.position);
+      durationLine = `-# ${progress} / ${totalDuration}`;
+    } else {
+      durationLine = `-# ${totalDuration}`;
+    }
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(durationLine),
+    );
   }
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(durationLine),
-  );
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupButtonsV2(player));
@@ -514,8 +566,19 @@ const SETUP_QUEUE_PAGE_SIZE = 4;
 
 /**
  * Build the Setup Channel Queue Toggle View.
- * Shows current + upcoming tracks with small square thumbnail.
- * Navigation buttons (⬆️ / ⬇️) are at the TOP of the panel.
+ * Shows current + upcoming tracks. The currently playing track uses the big
+ * header format; upcoming tracks use the compact format with absolute indices.
+ *
+ * Current track format:
+ *   QUEUE・N songs
+ *   ### 🎵  Title
+ *   Artist
+ *   -# duration (or -# elapsed / total when paused)
+ *   -# `absIdx`・@requester
+ *
+ * Upcoming track format (each separated by a Separator):
+ *   **Title** - Artist
+ *   -# `absIdx`・@requester
  *
  * @param {object} currentTrack - KazagumoTrack (currently playing)
  * @param {object[]} tracks     - Upcoming tracks array
@@ -550,15 +613,13 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
     ),
   );
 
-  // Header: QUEUE\u30023 songs
+  // Header: QUEUE・N songs
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(`QUEUE・${tracks.length} song${tracks.length !== 1 ? 's' : ''}`),
   );
 
-  // Current track section with small square thumbnail accessory
+  // ── Current track (big format) ─────────────────────────────────────────────
   const currentArtUrl = getSquareThumbnailUrl(currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail);
-
-  // Duration line for current track: -# total or -# progress / total when paused
   const currentTotalDur = formatDuration(currentTrack.length);
   let currentDurLine;
   if (player.paused && player.position > 0) {
@@ -567,31 +628,36 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
     currentDurLine = `-# ${currentTotalDur}`;
   }
 
+  // Absolute index of the currently playing track (item 7)
+  const currentAbsIdx = player.data?.get('absoluteQueueIndex') ?? 1;
+  const currentRequesterId = currentTrack.requester?.id || null;
+  const currentRequesterStr = currentRequesterId ? `<@${currentRequesterId}>` : '';
+  const currentRequesterLine = currentRequesterStr ? `-# \`${currentAbsIdx}\`・${currentRequesterStr}` : `-# \`${currentAbsIdx}\``;
+
   const currentTrackText =
-    `### \u25b6\ufe0f  ${currentTrack.title}\n` +
+    `### ${config.emojis.music}  ${currentTrack.title}\n` +
     `${currentTrack.author || 'Unknown'}\n` +
-    currentDurLine;
+    `${currentDurLine}\n` +
+    currentRequesterLine;
 
   const section = new SectionBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(currentTrackText))
     .setThumbnailAccessory(new ThumbnailBuilder().setURL(currentArtUrl));
   container.addSectionComponents(section);
 
-  // Upcoming tracks list with requester mentions
+  // ── Upcoming tracks (compact format, one Separator between each) ───────────
   if (pageTracks.length > 0) {
-    const trackLines = pageTracks.map((t, i) => {
-      const globalIdx = start + i + 1;
-      const paddedIdx = String(globalIdx).padStart(2, '0');
+    pageTracks.forEach((t, i) => {
+      container.addSeparatorComponents(new SeparatorBuilder());
+      const absIdx = currentAbsIdx + start + i + 1;
       const requesterId = t.requester?.id || null;
-      const requesterStr = requesterId ? `<@${requesterId}>` : 'Unknown';
-      const titleStr = `**${t.title}** - ${t.author || 'Unknown'}`;
-      const trackEmoji = resolvePlatformEmoji(t.sourceName);
-      return `${trackEmoji}-# \`${paddedIdx}\`・${requesterStr}\n${titleStr}`;
+      const requesterStr = requesterId ? `<@${requesterId}>` : '';
+      const requesterLine = requesterStr ? `-# \`${absIdx}\`・${requesterStr}` : `-# \`${absIdx}\``;
+      const trackText = `**${t.title}** - ${t.author || 'Unknown'}\n${requesterLine}`;
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(trackText));
     });
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(trackLines.join('\n')),
-    );
   } else {
+    container.addSeparatorComponents(new SeparatorBuilder());
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('*No upcoming tracks.*'),
     );
@@ -626,7 +692,9 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
@@ -640,6 +708,10 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
 
   const container = new ContainerBuilder();
 
+  // Apply dynamic accent color if available
+  const accentColor = player.data?.get('accentColor');
+  if (accentColor != null) container.setAccentColor(accentColor);
+
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(statusText),
   );
@@ -652,10 +724,19 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
     `👤 **Requested by:** ${requesterName}`;
 
   if (largeArt) {
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-    );
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
+    if (isYTM) {
+      // YouTube Music: 1:1 square thumbnail as section accessory
+      const section = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+      container.addSectionComponents(section);
+    } else {
+      // YouTube/other: 16:9 gallery image
+      container.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+      );
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
+    }
   } else {
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))

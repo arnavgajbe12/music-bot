@@ -1,4 +1,5 @@
 const { buildCategoryEmbed, buildSelectMenu } = require('../../slash/general/help');
+const { getPrefixes } = require('../../../utils/setupManager');
 
 const HELP_AUTO_DELETE_MS = 60_000; // 60 seconds
 const VALID_CATEGORIES = ['music', 'platform', 'setup', 'dj', 'general'];
@@ -14,7 +15,9 @@ module.exports = {
       ? args[0].toLowerCase()
       : 'music';
 
-    const embed = buildCategoryEmbed(category);
+    const prefixes = getPrefixes(message.guild.id);
+    const displayPrefix = prefixes[0] || '!';
+    const embed = buildCategoryEmbed(category, displayPrefix);
     const row = buildSelectMenu(category);
 
     const reply = await message.reply({ embeds: [embed], components: [row] });

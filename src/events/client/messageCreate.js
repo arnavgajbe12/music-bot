@@ -1,6 +1,6 @@
 const config = require('../../../config');
 const { buildErrorEmbed } = require('../../utils/embeds');
-const { getSetup, getSettings } = require('../../utils/setupManager');
+const { getSetup, getSettings, hasNoPrefix, getPrefixes } = require('../../utils/setupManager');
 const { logToWebhook } = require('../../utils/webhookLogger');
 
 // Map short platform prefixes to Kazagumo/LavaSrc search prefixes
@@ -12,6 +12,7 @@ const PLATFORM_PREFIXES = {
   sc: 'scsearch:',
   dz: 'dzsearch:',
   az: 'amzsearch:',
+  js: 'jssearch:',
 };
 
 module.exports = {
@@ -121,10 +122,39 @@ module.exports = {
     }
 
     // ── Prefix Command Handler ─────────────────────────────────────────────
-    if (!message.content.startsWith(config.botSetup.prefix)) return;
+    // Determine which prefix(es) are active for this guild
+    const guildPrefixes = getPrefixes(message.guild.id);
 
-    const args = message.content.slice(config.botSetup.prefix.length).trim().split(/\s+/);
-    const commandName = args.shift().toLowerCase();
+    // Find which prefix (if any) was used
+    let usedPrefix = null;
+    for (const p of guildPrefixes) {
+      if (message.content.startsWith(p)) {
+        usedPrefix = p;
+        break;
+      }
+    }
+
+    // Also allow the config default prefix as a fallback
+    if (!usedPrefix && message.content.startsWith(config.botSetup.prefix)) {
+      usedPrefix = config.botSetup.prefix;
+    }
+
+    // No-prefix check: if the user has no-prefix access, treat entire message as a command
+    const userHasNoPrefix = hasNoPrefix(message.author.id);
+    let args, commandName;
+
+    if (usedPrefix) {
+      args = message.content.slice(usedPrefix.length).trim().split(/\s+/);
+      commandName = args.shift().toLowerCase();
+    } else if (userHasNoPrefix) {
+      // No prefix used – treat the whole message as a command if it matches one
+      args = message.content.trim().split(/\s+/);
+      commandName = args.shift().toLowerCase();
+      // Only proceed if there's an actual command registered
+      if (!client.commands.has(commandName)) return;
+    } else {
+      return;
+    }
 
     const command = client.commands.get(commandName);
     if (!command) return;

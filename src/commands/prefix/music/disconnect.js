@@ -5,7 +5,7 @@ const { checkVoice } = require('../../../utils/functions');
 module.exports = {
   name: 'disconnect',
   aliases: ['dc', 'leave'],
-  description: 'Stop playback, clear the queue, and leave the voice channel.',
+  description: 'Destroy the player and forcefully disconnect the bot from the Voice Channel.',
   usage: '',
 
   async run(client, message) {
@@ -21,8 +21,23 @@ module.exports = {
 
     const channelName = message.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
+    // Clear queue and destroy player (Kazagumo destroy also triggers VC leave)
     player.queue.clear();
-    await player.destroy().catch(() => {});
+    try {
+      await player.destroy();
+    } catch {
+      // Ignore errors from destroy
+    }
+
+    // Force the bot to leave the VC via the voice adapter if still connected
+    try {
+      const botVoice = message.guild.members.me?.voice;
+      if (botVoice?.channel) {
+        await botVoice.disconnect();
+      }
+    } catch {
+      // Non-fatal
+    }
 
     const payload = buildConfirmV2(`👋 Left **${channelName}** and cleared the queue.`, 0xed4245);
     const reply = await message.reply(payload);
@@ -30,3 +45,4 @@ module.exports = {
     reply.once('delete', () => clearTimeout(timer));
   },
 };
+
