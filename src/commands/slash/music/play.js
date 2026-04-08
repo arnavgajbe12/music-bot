@@ -16,7 +16,9 @@ module.exports = {
   async run(client, interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const voiceCheck = checkVoice(interaction.member, interaction.guild);
+    // Fetch existing player first so checkVoice can validate against the correct VC
+    let player = client.manager.players.get(interaction.guild.id);
+    const voiceCheck = checkVoice(interaction.member, interaction.guild, player);
     if (!voiceCheck.ok) {
       return interaction.editReply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
@@ -24,9 +26,6 @@ module.exports = {
     const rawQuery = interaction.options.getString('query');
     const voiceChannel = interaction.member.voice.channel;
 
-    let player = client.manager.players.get(interaction.guild.id);
-
-    // If a player exists but the bot was manually disconnected from VC, destroy it so we can rejoin
     const botVoiceChannelId = interaction.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
       console.log(`[slash play] Stale player detected in guild "${interaction.guild.id}" — destroying before rejoin.`);
@@ -69,9 +68,10 @@ module.exports = {
     try {
       if (settings.playbackSource) {
         const isUrl = /^https?:\/\//i.test(rawQuery);
-        const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
-        console.log(`[slash play] Searching with guild source "${settings.playbackSource}" → query: "${query}"`);
-        result = await client.manager.search(query, { requester: interaction.user });
+        // Pass the search source via options.source so Kazagumo doesn't double-prefix the query
+        const searchOptions = { requester: interaction.user, source: isUrl ? undefined : settings.playbackSource };
+        console.log(`[slash play] Searching with guild source "${settings.playbackSource}" → rawQuery: "${rawQuery}"`);
+        result = await client.manager.search(rawQuery, searchOptions);
         console.log(`[slash play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
         // If no tracks found with configured source, fall back to the default chain
         if (!result || !result.tracks.length) {
@@ -89,7 +89,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
@@ -111,7 +111,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
-          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Result Type', value: result?.type || 'null/undefined' },

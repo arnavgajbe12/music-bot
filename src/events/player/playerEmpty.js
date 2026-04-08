@@ -23,9 +23,11 @@ module.exports = {
 
       if (lastTrack) {
         try {
-          // Search for a related track using the last played track's artist + title
-          const searchQuery = `ytmsearch:${[lastTrack.author, lastTrack.title].filter(Boolean).join(' ')}`;
-          const result = await client.manager.search(searchQuery, { requester: lastTrack.requester });
+          // Search for a related track using the last played track's artist + title.
+          // Use options.source instead of embedding the prefix in the query so Kazagumo
+          // doesn't double-prefix (e.g. 'ytsearch:ytmsearch:...' → no results).
+          const autoplayQuery = [lastTrack.author, lastTrack.title].filter(Boolean).join(' ');
+          const result = await client.manager.search(autoplayQuery, { requester: lastTrack.requester, source: 'ytmsearch:' });
           if (result && result.tracks && result.tracks.length > 0) {
             const AUTOPLAY_CANDIDATE_POOL_SIZE = 5;
             // Prefer a track that isn't an exact duplicate

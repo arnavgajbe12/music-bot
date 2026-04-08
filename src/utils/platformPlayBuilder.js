@@ -29,7 +29,8 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
 
       const rawQuery = interaction.options.getString('query');
       const isUrl = /^https?:\/\//i.test(rawQuery);
-      const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
+      // Pass source via options so Kazagumo doesn't double-prefix the query string
+      const searchOptions = { requester: interaction.user, source: isUrl ? undefined : searchPrefix };
       const voiceChannel = interaction.member.voice.channel;
 
       let player = client.manager.players.get(interaction.guild.id);
@@ -63,7 +64,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
 
       let result;
       try {
-        result = await client.manager.search(query, { requester: interaction.user });
+        result = await client.manager.search(rawQuery, searchOptions);
       } catch {
         return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
       }
@@ -129,7 +130,8 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
 
       const rawQuery = args.join(' ');
       const isUrl = /^https?:\/\//i.test(rawQuery);
-      const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
+      // Pass source via options so Kazagumo doesn't double-prefix the query string
+      const searchOptions = { requester: message.author, source: isUrl ? undefined : searchPrefix };
       const voiceChannel = message.member.voice.channel;
 
       await message.channel.sendTyping();
@@ -164,7 +166,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
 
       let result;
       try {
-        result = await client.manager.search(query, { requester: message.author });
+        result = await client.manager.search(rawQuery, searchOptions);
       } catch (error) {
         console.error(`[prefix ${name}] Search error:`, error);
         return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });

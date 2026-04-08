@@ -23,7 +23,7 @@ client.slashCommands = new Collection();
 const nodes = [
   {
     name: 'Main',
-    url: `${process.env.LAVA_HOST}:${process.env.LAVA_PORT}`,
+    url: `${(process.env.LAVA_HOST || 'localhost').replace(/^https?:\/\/|^wss?:\/\//i, '')}:${process.env.LAVA_PORT || 2333}`,
     auth: process.env.LAVA_PASS,
     secure: process.env.LAVA_SECURE === 'true',
   },
@@ -32,7 +32,10 @@ const nodes = [
 // ─── Kazagumo (Music Manager) ───────────────────────────────────────────────────
 client.manager = new Kazagumo(
   {
-    defaultSearchengine: config.player.defaultSearchPlatform,
+    // Kazagumo's defaultSearchEngine only accepts 'youtube' | 'youtube_music' | 'soundcloud'.
+    // config.player.defaultSearchPlatform holds 'ytmsearch' which Kazagumo silently ignores,
+    // so we hard-code 'youtube_music' here to get the desired ytmsearch: default.
+    defaultSearchEngine: 'youtube_music',
     plugins: [],
   },
   new Connectors.DiscordJS(client),
