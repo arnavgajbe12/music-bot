@@ -1,6 +1,5 @@
 const { buildIdleV2, buildSetupIdleV2 } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
-const { searchWithFallback } = require('../../utils/functions');
 const config = require('../../../config');
 
 module.exports = {
@@ -13,41 +12,7 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
-    // ── Autoplay ──────────────────────────────────────────────────────────────
-    const autoplayEnabled = settings.autoplay || player.data.get('autoplay') === true;
-    if (autoplayEnabled) {
-      const lastTrack = player.data.get('lastTrack');
-      if (lastTrack) {
-        try {
-          // Search for a related track using the last played song's artist/title
-          const query = `${lastTrack.title} ${lastTrack.author || ''}`.trim();
-          const result = await searchWithFallback(client.manager, query, {
-            id: 'autoplay',
-            username: 'Autoplay',
-            displayName: 'Autoplay',
-          });
-
-          if (result && result.tracks && result.tracks.length > 0) {
-            // Prefer a track that is not the exact same URI as the last played one
-            const candidate =
-              result.tracks.find((t) => t.uri !== lastTrack.uri) || result.tracks[1] || result.tracks[0];
-
-            if (candidate) {
-              player.queue.add(candidate);
-              if (!player.playing && !player.paused) {
-                await player.play();
-              }
-              return; // autoplay kicked in – don't show idle panel
-            }
-          }
-        } catch (err) {
-          console.error('[playerEmpty] Autoplay search error:', err);
-          // Fall through to idle panel
-        }
-      }
-    }
-
-    // ── Idle panel ────────────────────────────────────────────────────────────
+    // Choose idle payload based on whether a setup panel exists
     const payload = setupInfo
       ? buildSetupIdleV2()
       : buildIdleV2(config.images.defaultThumbnail, settings.largeArt);

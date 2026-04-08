@@ -12,9 +12,6 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
-    // ── Store last track for autoplay ────────────────────────────────────────
-    player.data.set('lastTrack', track);
-
     // ── Setup channel panel edit ─────────────────────────────────────────────
     if (setupInfo) {
       try {

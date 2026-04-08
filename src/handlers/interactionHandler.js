@@ -1,15 +1,4 @@
-const {
-  EmbedBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ContainerBuilder,
-  TextDisplayBuilder,
-  MessageFlags,
-} = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { buildErrorEmbed, resolvePlatformEmoji, resolveSourceDisplayName, formatDuration } = require('../utils/embeds');
 const {
   buildPlayerButtonsV2,
@@ -19,9 +8,10 @@ const {
   buildNowPlayingV2,
   buildSetupNowPlayingV2,
   buildSetupQueueViewV2,
+  buildSetupButtonsV2,
   extractDominantColor,
 } = require('../utils/componentBuilder');
-const { getSettings, getSetup, updateSettings } = require('../utils/setupManager');
+const { getSettings, getSetup } = require('../utils/setupManager');
 const config = require('../../config');
 
 /**
@@ -59,35 +49,6 @@ module.exports = (client) => {
         } else {
           await interaction.reply({ embeds: [errEmbed], ephemeral: true }).catch(() => {});
         }
-      }
-      return;
-    }
-
-    // ── Modal Submissions ──────────────────────────────────────────────────
-    if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'setup_vol_modal') {
-        const player = client.manager.players.get(interaction.guild.id);
-        if (!player) {
-          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
-        }
-        const raw = interaction.fields.getTextInputValue('vol_input');
-        const vol = parseInt(raw, 10);
-        if (isNaN(vol) || vol < 0 || vol > 200) {
-          return interaction.reply({
-            embeds: [buildErrorEmbed('Please enter a number between **0** and **200**.')],
-            ephemeral: true,
-          });
-        }
-        await player.setVolume(vol).catch(() => {});
-        await interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(config.embeds.color)
-              .setDescription(`🔊 Volume set to **${vol}%**.`),
-          ],
-          ephemeral: true,
-        });
-        return;
       }
       return;
     }
@@ -289,131 +250,6 @@ module.exports = (client) => {
         return;
       }
 
-      // ── Setup Channel Controller dropdown ─────────────────────────────────
-      if (interaction.customId === 'setup_controller') {
-        const setupInfo = getSetup(interaction.guild.id);
-        if (!setupInfo || interaction.message?.id !== setupInfo.messageId) {
-          return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
-        }
-
-        const player = client.manager.players.get(interaction.guild.id);
-        if (!player || !player.queue.current) {
-          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
-        }
-
-        // Require user to be in the same voice channel
-        const vcCheck = interaction.member.voice?.channel;
-        if (!vcCheck || vcCheck.id !== player.voiceId) {
-          return interaction.reply({
-            embeds: [buildErrorEmbed('You must be in the same voice channel as the bot to use controls.')],
-            ephemeral: true,
-          });
-        }
-
-        const selected = interaction.values[0];
-
-        switch (selected) {
-          case 'controller_volume': {
-            await interaction.deferUpdate();
-            const currentVol = player.volume ?? 100;
-            const volContainer = new ContainerBuilder()
-              .addTextDisplayComponents(
-                new TextDisplayBuilder().setContent(`🔊 **Volume** — Current: **${currentVol}%**\nUse the buttons below to adjust, or enter a specific value.`),
-              )
-              .addActionRowComponents(
-                new ActionRowBuilder().addComponents(
-                  new ButtonBuilder()
-                    .setCustomId('setup_vol_ephemeral_up')
-                    .setEmoji('⬆️')
-                    .setLabel('+10%')
-                    .setStyle(ButtonStyle.Secondary),
-                  new ButtonBuilder()
-                    .setCustomId('setup_vol_ephemeral_down')
-                    .setEmoji('⬇️')
-                    .setLabel('-10%')
-                    .setStyle(ButtonStyle.Secondary),
-                  new ButtonBuilder()
-                    .setCustomId('setup_vol_ephemeral_manual')
-                    .setEmoji('🔧')
-                    .setLabel('Manual')
-                    .setStyle(ButtonStyle.Primary),
-                ),
-              );
-            await interaction.followUp({ components: [volContainer], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
-            break;
-          }
-
-          case 'controller_loop_track': {
-            const newMode = player.loop === 'track' ? 'none' : 'track';
-            player.setLoop(newMode);
-            const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
-            const accentColor = await resolveAccentColor(player, artUrl);
-            const isQueueView = player.data.get('setupQueueView') === true;
-            let payload;
-            if (isQueueView) {
-              const tracks = [...player.queue];
-              const qPage = player.data.get('setupQueuePage') || 1;
-              payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player);
-            } else {
-              payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
-            }
-            await interaction.update(payload);
-            break;
-          }
-
-          case 'controller_loop_queue': {
-            const newMode = player.loop === 'queue' ? 'none' : 'queue';
-            player.setLoop(newMode);
-            const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
-            const accentColor = await resolveAccentColor(player, artUrl);
-            const isQueueView = player.data.get('setupQueueView') === true;
-            let payload;
-            if (isQueueView) {
-              const tracks = [...player.queue];
-              const qPage = player.data.get('setupQueuePage') || 1;
-              payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player);
-            } else {
-              payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
-            }
-            await interaction.update(payload);
-            break;
-          }
-
-          case 'controller_clear_queue': {
-            player.queue.clear();
-            await interaction.deferUpdate();
-            await interaction.followUp({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(config.embeds.color)
-                  .setDescription('🗑️ Queue cleared.'),
-              ],
-              ephemeral: true,
-            });
-            break;
-          }
-
-          case 'controller_disconnect': {
-            player.queue.clear();
-            await player.skip().catch(() => {});
-            await interaction.deferUpdate();
-            await interaction.followUp({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(config.embeds.color)
-                  .setDescription('👋 Disconnected from the voice channel.'),
-              ],
-              ephemeral: true,
-            });
-            break;
-          }
-
-          default:
-            await interaction.reply({ embeds: [buildErrorEmbed('Unknown controller option.')], ephemeral: true });
-        }
-        return;
-      }
-
       return;
     }
 
@@ -470,23 +306,17 @@ module.exports = (client) => {
         return interaction.update(payload);
       }
 
-      // ── Setup channel buttons (Queue, Shuffle, Settings + ephemeral vol) ──────
-      const setupButtonIds = ['setup_queue', 'setup_shuffle', 'setup_settings',
-        'setup_vol_ephemeral_up', 'setup_vol_ephemeral_down', 'setup_vol_ephemeral_manual'];
-      if (setupButtonIds.includes(customId)) {
+      // ── Setup channel Row 2 buttons ────────────────────────────────────────
+      const setupRow2Ids = ['setup_queue', 'setup_shuffle', 'setup_vol_down', 'setup_vol_up'];
+      if (setupRow2Ids.includes(customId)) {
+        const setupInfo = getSetup(guild.id);
+        if (!setupInfo || interaction.message.id !== setupInfo.messageId) {
+          return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
+        }
+
         const player = client.manager.players.get(guild.id);
         if (!player) {
           return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
-        }
-
-        // Ephemeral volume buttons do NOT require being on the setup panel message
-        const isEphemeralVol = customId.startsWith('setup_vol_ephemeral_');
-
-        if (!isEphemeralVol) {
-          const setupInfo = getSetup(guild.id);
-          if (!setupInfo || interaction.message.id !== setupInfo.messageId) {
-            return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
-          }
         }
 
         // Require user to be in the same voice channel
@@ -498,17 +328,19 @@ module.exports = (client) => {
           });
         }
 
-        // ── 📋 Queue toggle ──────────────────────────────────────────────────
         if (customId === 'setup_queue') {
+          // Toggle queue view
           const isQueueView = player.data.get('setupQueueView') === true;
           if (!player.queue.current) return interaction.deferUpdate().catch(() => {});
           const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
           const accentColor = await resolveAccentColor(player, artUrl);
           if (isQueueView) {
+            // Switch back to art view
             player.data.set('setupQueueView', false);
             const payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
             return interaction.update(payload);
           } else {
+            // Switch to queue view
             player.data.set('setupQueueView', true);
             player.data.set('setupQueuePage', 1);
             const tracks = [...player.queue];
@@ -517,122 +349,31 @@ module.exports = (client) => {
           }
         }
 
-        // ── 🔀 Shuffle toggle ────────────────────────────────────────────────
         if (customId === 'setup_shuffle') {
-          const isShuffled = player.data.get('shuffleMode') === true;
-          if (!isShuffled) {
-            // Enable: shuffle the current queue and mark mode ON
-            const queueArr = [...player.queue];
-            for (let i = queueArr.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [queueArr[i], queueArr[j]] = [queueArr[j], queueArr[i]];
-            }
-            player.queue.splice(0, player.queue.length, ...queueArr);
-            player.data.set('shuffleMode', true);
-          } else {
-            // Disable shuffle mode
-            player.data.set('shuffleMode', false);
-          }
-          // Refresh panel to show updated button color
-          if (!player.queue.current) return interaction.deferUpdate().catch(() => {});
-          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
-          const accentColor = await resolveAccentColor(player, artUrl);
-          const isQueueView = player.data.get('setupQueueView') === true;
-          let payload;
-          if (isQueueView) {
-            const tracks = [...player.queue];
-            const qPage = player.data.get('setupQueuePage') || 1;
-            payload = buildSetupQueueViewV2(player.queue.current, tracks, qPage, accentColor, player);
-          } else {
-            payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
-          }
-          return interaction.update(payload);
-        }
-
-        // ── ⚙️ Settings (ephemeral placeholder) ──────────────────────────────
-        if (customId === 'setup_settings') {
           await interaction.deferUpdate();
-          const settings = getSettings(guild.id);
-          const settingsContainer = new ContainerBuilder()
-            .addTextDisplayComponents(
-              new TextDisplayBuilder().setContent(
-                `⚙️ **Settings**\nConfigure bot behaviour for this server.\n\n` +
-                `🔄 **Autoplay** — Auto-queue a related track when the queue ends.\n` +
-                `🕐 **24/7 Mode** — Keep the bot in the voice channel even when idle.`,
-              ),
-            )
-            .addActionRowComponents(
-              new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                  .setCustomId('settings_autoplay_on')
-                  .setLabel('Autoplay ON')
-                  .setEmoji('🔄')
-                  .setStyle(settings.autoplay ? ButtonStyle.Primary : ButtonStyle.Secondary),
-                new ButtonBuilder()
-                  .setCustomId('settings_autoplay_off')
-                  .setLabel('Autoplay OFF')
-                  .setEmoji('⏹️')
-                  .setStyle(!settings.autoplay ? ButtonStyle.Danger : ButtonStyle.Secondary),
-                new ButtonBuilder()
-                  .setCustomId('settings_247_on')
-                  .setLabel('24/7 ON')
-                  .setEmoji('🕐')
-                  .setStyle(settings.mode247 ? ButtonStyle.Primary : ButtonStyle.Secondary),
-                new ButtonBuilder()
-                  .setCustomId('settings_247_off')
-                  .setLabel('24/7 OFF')
-                  .setEmoji('⏹️')
-                  .setStyle(!settings.mode247 ? ButtonStyle.Danger : ButtonStyle.Secondary),
-              ),
-            );
-          await interaction.followUp({ components: [settingsContainer], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+          const queueArr = [...player.queue];
+          for (let i = queueArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [queueArr[i], queueArr[j]] = [queueArr[j], queueArr[i]];
+          }
+          player.queue.splice(0, player.queue.length, ...queueArr);
           return;
         }
 
-        // ── Ephemeral Volume buttons ─────────────────────────────────────────
-        if (customId === 'setup_vol_ephemeral_up') {
-          const newVol = Math.min(200, (player.volume ?? 100) + 10);
-          await player.setVolume(newVol).catch(() => {});
+        if (customId === 'setup_vol_down') {
           await interaction.deferUpdate();
-          return;
-        }
-
-        if (customId === 'setup_vol_ephemeral_down') {
           const newVol = Math.max(0, (player.volume ?? 100) - 10);
           await player.setVolume(newVol).catch(() => {});
+          return;
+        }
+
+        if (customId === 'setup_vol_up') {
           await interaction.deferUpdate();
+          const newVol = Math.min(200, (player.volume ?? 100) + 10);
+          await player.setVolume(newVol).catch(() => {});
           return;
         }
 
-        if (customId === 'setup_vol_ephemeral_manual') {
-          const modal = new ModalBuilder()
-            .setCustomId('setup_vol_modal')
-            .setTitle('Set Volume');
-          const volInput = new TextInputBuilder()
-            .setCustomId('vol_input')
-            .setLabel('Volume (0 – 200)')
-            .setStyle(TextInputStyle.Short)
-            .setMinLength(1)
-            .setMaxLength(3)
-            .setPlaceholder('e.g. 80')
-            .setRequired(true);
-          modal.addComponents(new ActionRowBuilder().addComponents(volInput));
-          await interaction.showModal(modal);
-          return;
-        }
-
-        return;
-      }
-
-      // ── Settings toggle buttons (from ephemeral settings panel) ─────────────
-      const settingsButtonIds = ['settings_autoplay_on', 'settings_autoplay_off', 'settings_247_on', 'settings_247_off'];
-      if (settingsButtonIds.includes(customId)) {
-        const guildId = guild.id;
-        if (customId === 'settings_autoplay_on') updateSettings(guildId, { autoplay: true });
-        else if (customId === 'settings_autoplay_off') updateSettings(guildId, { autoplay: false });
-        else if (customId === 'settings_247_on') updateSettings(guildId, { mode247: true });
-        else if (customId === 'settings_247_off') updateSettings(guildId, { mode247: false });
-        await interaction.deferUpdate();
         return;
       }
 
