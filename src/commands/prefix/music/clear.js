@@ -19,7 +19,7 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
-    const count = player.queue.size;
+    const count = player.queue.length;
     if (count === 0) {
       return message.reply({ embeds: [buildErrorEmbed('The queue is already empty.')] });
     }

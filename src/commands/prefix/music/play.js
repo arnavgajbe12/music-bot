@@ -15,7 +15,7 @@ module.exports = {
       return message.reply({ embeds: [buildErrorEmbed('Please provide a song name or URL.')] });
     }
 
-    const voiceCheck = checkVoice(message.member, message.guild);
+    const voiceCheck = checkVoice(message.member, message.guild, client.manager.players.get(message.guild.id));
     if (!voiceCheck.ok) {
       return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
@@ -90,7 +90,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-          { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+          { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
@@ -111,7 +111,7 @@ module.exports = {
         color: 0xed4245,
         fields: [
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
-          { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+          { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
           { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
@@ -141,7 +141,7 @@ module.exports = {
       const track = result.tracks[0];
       player.queue.add(track);
       if (!wasIdle) {
-        const queueSize = player.queue.size ?? player.queue.length;
+        const queueSize = player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         const reply = await message.reply(payload);
         setTimeout(() => reply.delete().catch(() => {}), 15000);
