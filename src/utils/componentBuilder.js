@@ -585,7 +585,8 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
       const requesterId = t.requester?.id || null;
       const requesterStr = requesterId ? `<@${requesterId}>` : 'Unknown';
       const titleStr = `**${t.title}** - ${t.author || 'Unknown'}`;
-      return `🟢-# \`${paddedIdx}\`・${requesterStr}\n${titleStr}`;
+      const trackEmoji = resolvePlatformEmoji(t.sourceName);
+      return `${trackEmoji}-# \`${paddedIdx}\`・${requesterStr}\n${titleStr}`;
     });
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(trackLines.join('\n')),

@@ -5,6 +5,10 @@ module.exports = {
    * @param {import('kazagumo').KazagumoTrack} track
    */
   async run(client, player, track) { // eslint-disable-line no-unused-vars
+    console.log(
+      `[playerEnd] Track ended: "${track?.title}" in guild "${player?.guildId}"`,
+    );
+
     // Delete any /nowplaying command messages that were tracking this song
     const nowPlayingCmdMessages = player.data.get('nowPlayingCmdMessages');
     if (nowPlayingCmdMessages && nowPlayingCmdMessages.length > 0) {

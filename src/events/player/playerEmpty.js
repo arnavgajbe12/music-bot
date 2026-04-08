@@ -1,5 +1,6 @@
 const { buildIdleV2, buildSetupIdleV2 } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
+const { logToWebhook } = require('../../utils/webhookLogger');
 const config = require('../../../config');
 
 module.exports = {
@@ -11,6 +12,8 @@ module.exports = {
     const guildId = player.guildId;
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
+
+    console.log(`[playerEmpty] Queue exhausted for guild "${guildId}". Autoplay=${settings.autoplay}`);
 
     // ── Autoplay: enqueue a related track when queue runs out ────────────────
     if (settings.autoplay) {

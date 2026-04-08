@@ -3,6 +3,7 @@ const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
 const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
+const { logToWebhook } = require('../../../utils/webhookLogger');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,6 +29,7 @@ module.exports = {
     // If a player exists but the bot was manually disconnected from VC, destroy it so we can rejoin
     const botVoiceChannelId = interaction.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
+      console.log(`[slash play] Stale player detected in guild "${interaction.guild.id}" — destroying before rejoin.`);
       await player.destroy().catch(() => {});
       player = null;
     }
@@ -68,26 +70,58 @@ module.exports = {
       if (settings.playbackSource) {
         const isUrl = /^https?:\/\//i.test(rawQuery);
         const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
+        console.log(`[slash play] Searching with guild source "${settings.playbackSource}" → query: "${query}"`);
         result = await client.manager.search(query, { requester: interaction.user });
+        console.log(`[slash play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
         // If no tracks found with configured source, fall back to the default chain
         if (!result || !result.tracks.length) {
+          console.log(`[slash play] Primary source returned no tracks, trying fallback chain...`);
           result = await searchWithFallback(client.manager, rawQuery, interaction.user);
         }
       } else {
+        console.log(`[slash play] No guild source configured, using fallback chain for: "${rawQuery}"`);
         result = await searchWithFallback(client.manager, rawQuery, interaction.user);
       }
-    } catch {
+    } catch (err) {
+      console.error('[slash play] Search threw an exception:', err);
+      logToWebhook({
+        title: '🚨 /play Search Exception',
+        color: 0xed4245,
+        fields: [
+          { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'Query', value: rawQuery },
+          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
+        ],
+      }).catch(() => {});
       // If the configured source throws, try the fallback chain
       try {
         result = await searchWithFallback(client.manager, rawQuery, interaction.user);
-      } catch {
+      } catch (err2) {
+        console.error('[slash play] Fallback search also threw:', err2);
         return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
       }
     }
 
     if (!result || !result.tracks.length) {
+      console.warn(`[slash play] ❌ No results for query: "${rawQuery}" in guild "${interaction.guild.id}"`);
+      logToWebhook({
+        title: '❌ /play – No Results',
+        color: 0xed4245,
+        fields: [
+          { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
+          { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'Query', value: rawQuery },
+          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Result Type', value: result?.type || 'null/undefined' },
+          { name: 'Track Count', value: String(result?.tracks?.length ?? 0) },
+        ],
+      }).catch(() => {});
       return interaction.editReply({ embeds: [buildErrorEmbed('No results found for that query.')] });
     }
+
+    console.log(`[slash play] ✅ Found result: type=${result.type}, tracks=${result.tracks.length} in guild "${interaction.guild.id}"`);
 
     const wasIdle = !player.playing && !player.paused;
 

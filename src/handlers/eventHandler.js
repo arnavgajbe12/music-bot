@@ -35,25 +35,54 @@ module.exports = (client) => {
   // These fire after the manager is connected, so we listen on 'ready'
   client.once('ready', () => {
     const shoukaku = client.manager.shoukaku;
+    const { logToWebhook } = require('../utils/webhookLogger');
 
     shoukaku.on('ready', (name) => {
       console.log(`[Shoukaku] Node "${name}" is ready.`);
       logToChannel(client, `${require('../../config').emojis.success} Lavalink node **${name}** is now **connected**.`);
+      logToWebhook({
+        title: '✅ Lavalink Node Ready',
+        color: 0x57f287,
+        fields: [{ name: 'Node', value: name }],
+      }).catch(() => {});
     });
 
     shoukaku.on('error', (name, error) => {
       console.error(`[Shoukaku] Node "${name}" encountered an error:`, error);
       logToChannel(client, `${require('../../config').emojis.error} Lavalink node **${name}** encountered an error: \`${error.message}\``);
+      logToWebhook({
+        title: '🚨 Lavalink Node Error',
+        color: 0xed4245,
+        fields: [
+          { name: 'Node', value: name, inline: true },
+          { name: 'Error', value: String(error?.message || error) },
+          { name: 'Stack', value: (error?.stack || 'N/A').slice(0, 1000) },
+        ],
+      }).catch(() => {});
     });
 
     shoukaku.on('close', (name, code, reason) => {
       console.warn(`[Shoukaku] Node "${name}" closed. Code: ${code}, Reason: ${reason || 'No reason'}`);
       logToChannel(client, `⚠️ Lavalink node **${name}** disconnected. Code: \`${code}\``);
+      logToWebhook({
+        title: '⚠️ Lavalink Node Closed',
+        color: 0xffa500,
+        fields: [
+          { name: 'Node', value: name, inline: true },
+          { name: 'Code', value: String(code), inline: true },
+          { name: 'Reason', value: reason || 'No reason provided' },
+        ],
+      }).catch(() => {});
     });
 
     shoukaku.on('reconnecting', (name) => {
       console.log(`[Shoukaku] Node "${name}" is reconnecting...`);
       logToChannel(client, `🔄 Lavalink node **${name}** is reconnecting...`);
+      logToWebhook({
+        title: '🔄 Lavalink Node Reconnecting',
+        color: 0xfee75c,
+        fields: [{ name: 'Node', value: name }],
+      }).catch(() => {});
     });
   });
 };
