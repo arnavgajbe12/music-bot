@@ -37,7 +37,8 @@ module.exports = {
       ],
     });
 
-    // Notify the text channel
+    // Notify the text channel (skip if this was an intentional disconnect)
+    if (player?.data?.get('intentionalDisconnect')) return;
     const channelId = player?.data?.get('textChannel');
     if (channelId) {
       const channel = client.channels.cache.get(channelId);
