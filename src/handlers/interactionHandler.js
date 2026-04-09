@@ -10,6 +10,7 @@ const {
   buildSetupQueueViewV2,
   buildSetupButtonsV2,
   extractDominantColor,
+  buildConfirmV2,
 } = require('../utils/componentBuilder');
 const { getSettings, getSetup } = require('../utils/setupManager');
 const config = require('../../config');
@@ -292,6 +293,204 @@ module.exports = (client) => {
         });
       }
 
+      // ── Setup Channel: Controls dropdown (Row 3) ──────────────────────────
+      if (interaction.customId === 'setup_controls') {
+        const player = client.manager.players.get(interaction.guild.id);
+        if (!player) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        const voiceChannel = interaction.member.voice?.channel;
+        if (!voiceChannel || voiceChannel.id !== player.voiceId) {
+          return interaction.reply({
+            embeds: [buildErrorEmbed('You must be in the same voice channel as the bot to use controls.')],
+            ephemeral: true,
+          });
+        }
+
+        const selected = interaction.values[0];
+
+        if (selected === 'loop_track') {
+          const newMode = player.loop === 'track' ? 'none' : 'track';
+          player.setLoop(newMode);
+          const modeText = newMode === 'track' ? '🔂 **Track loop enabled**' : '⏹️ **Loop disabled**';
+          await interaction.deferUpdate();
+          return interaction.followUp({
+            embeds: [new EmbedBuilder().setColor(config.embeds.color).setDescription(modeText)],
+            ephemeral: true,
+          });
+        }
+
+        if (selected === 'loop_queue') {
+          const newMode = player.loop === 'queue' ? 'none' : 'queue';
+          player.setLoop(newMode);
+          const modeText = newMode === 'queue' ? '🔁 **Queue loop enabled**' : '⏹️ **Loop disabled**';
+          await interaction.deferUpdate();
+          return interaction.followUp({
+            embeds: [new EmbedBuilder().setColor(config.embeds.color).setDescription(modeText)],
+            ephemeral: true,
+          });
+        }
+
+        if (selected === 'volume_info') {
+          const currentVol = player.volume ?? 100;
+          const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+          const volRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('setup_vol_down').setEmoji('🔉').setLabel('-10').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('setup_vol_up').setEmoji('🔊').setLabel('+10').setStyle(ButtonStyle.Primary),
+          );
+          return interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(config.embeds.color)
+                .setTitle('🔊 Volume Control')
+                .setDescription(`Current volume: **${currentVol}%**\nUse the buttons below to adjust.`)
+                .setFooter({ text: config.embeds.footerText }),
+            ],
+            components: [volRow],
+            ephemeral: true,
+          });
+        }
+
+        if (selected === 'disconnect') {
+          const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
+          player.data.set('intentionalDisconnect', true);
+          player.queue.clear();
+          try { await player.destroy(); } catch { /* ignore */ }
+          try {
+            const botVoice = interaction.guild.members.me?.voice;
+            if (botVoice?.channel) await botVoice.disconnect();
+          } catch { /* ignore */ }
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xed4245).setDescription(`👋 Disconnected from **${channelName}** and cleared the queue.`)],
+            ephemeral: true,
+          });
+        }
+
+        return interaction.deferUpdate().catch(() => {});
+      }
+
+      // ── Setup Channel: Manage Queue dropdown ──────────────────────────────
+      if (interaction.customId === 'setup_manage_queue') {
+        const player = client.manager.players.get(interaction.guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+
+        const voiceChannel = interaction.member.voice?.channel;
+        if (!voiceChannel || voiceChannel.id !== player.voiceId) {
+          return interaction.reply({
+            embeds: [buildErrorEmbed('You must be in the same voice channel as the bot to use controls.')],
+            ephemeral: true,
+          });
+        }
+
+        const selected = interaction.values[0];
+
+        if (selected === 'clear_queue') {
+          const count = player.queue.length;
+          player.queue.clear();
+          await interaction.deferUpdate();
+          // Refresh queue view
+          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const accentColor = await resolveAccentColor(player, artUrl);
+          const tracks = [...player.queue];
+          const recommendations = player.data.get('setupRecommendations') || [];
+          const page = player.data.get('setupQueuePage') || 1;
+          const payload = buildSetupQueueViewV2(player.queue.current, tracks, page, accentColor, player, recommendations);
+          await interaction.editReply(payload).catch(() => {});
+          return interaction.followUp({
+            embeds: [new EmbedBuilder().setColor(config.embeds.color).setDescription(`🗑️ Cleared **${count}** track(s) from the queue.`)],
+            ephemeral: true,
+          });
+        }
+
+        if (selected === 'reverse_queue') {
+          const queueArr = [...player.queue];
+          queueArr.reverse();
+          player.queue.splice(0, player.queue.length, ...queueArr);
+          await interaction.deferUpdate();
+          // Refresh queue view
+          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const accentColor = await resolveAccentColor(player, artUrl);
+          const tracks = [...player.queue];
+          const recommendations = player.data.get('setupRecommendations') || [];
+          const page = player.data.get('setupQueuePage') || 1;
+          const payload = buildSetupQueueViewV2(player.queue.current, tracks, page, accentColor, player, recommendations);
+          await interaction.editReply(payload).catch(() => {});
+          return interaction.followUp({
+            embeds: [new EmbedBuilder().setColor(config.embeds.color).setDescription(`🔃 Queue reversed!`)],
+            ephemeral: true,
+          });
+        }
+
+        if (selected === 'remove_tracks') {
+          const tracks = [...player.queue];
+          if (tracks.length === 0) {
+            return interaction.reply({ embeds: [buildErrorEmbed('There are no tracks in the queue to remove.')], ephemeral: true });
+          }
+          // Build multi-select menu (max 25 options)
+          const { ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+          const SELECT_MAX = 100;
+          const options = tracks.slice(0, 25).map((t, i) => {
+            const raw = t.title || 'Unknown';
+            const label = raw.length > SELECT_MAX ? raw.slice(0, SELECT_MAX - 3) + '...' : raw;
+            const rawDesc = `${t.author || 'Unknown'} — ${formatDuration(t.length)}`;
+            const desc = rawDesc.length > SELECT_MAX ? rawDesc.slice(0, SELECT_MAX - 3) + '...' : rawDesc;
+            return new StringSelectMenuOptionBuilder().setLabel(label).setDescription(desc).setValue(String(i));
+          });
+          const removeRow = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId('setup_queue_remove_select')
+              .setPlaceholder('Select tracks to remove…')
+              .setMinValues(1)
+              .setMaxValues(Math.min(options.length, 25))
+              .addOptions(options),
+          );
+          return interaction.reply({ components: [removeRow], ephemeral: true });
+        }
+
+        return interaction.deferUpdate().catch(() => {});
+      }
+
+      // ── Setup Channel: Remove-tracks multi-select ─────────────────────────
+      if (interaction.customId === 'setup_queue_remove_select') {
+        const player = client.manager.players.get(interaction.guild.id);
+        if (!player || !player.queue.current) {
+          return interaction.reply({ embeds: [buildErrorEmbed('There is no active player.')], ephemeral: true });
+        }
+        const indices = interaction.values.map(Number).sort((a, b) => b - a); // descending so splice doesn't shift
+        for (const idx of indices) {
+          if (idx >= 0 && idx < player.queue.length) {
+            player.queue.splice(idx, 1);
+          }
+        }
+        await interaction.deferUpdate();
+        // Refresh the setup queue panel if it's still showing
+        try {
+          const setupInfo = getSetup(interaction.guild.id);
+          if (setupInfo) {
+            const setupChannel = client.channels.cache.get(setupInfo.channelId);
+            if (setupChannel?.isTextBased()) {
+              const setupMsg = await setupChannel.messages.fetch(setupInfo.messageId).catch(() => null);
+              if (setupMsg?.editable && player.data.get('setupQueueView')) {
+                const artUrl = player.queue.current?.thumbnail || player.queue.current?.artworkUrl || null;
+                const accentColor = await resolveAccentColor(player, artUrl);
+                const tracks = [...player.queue];
+                const recommendations = player.data.get('setupRecommendations') || [];
+                const page = player.data.get('setupQueuePage') || 1;
+                const payload = buildSetupQueueViewV2(player.queue.current, tracks, page, accentColor, player, recommendations);
+                await setupMsg.edit(payload).catch(() => {});
+              }
+            }
+          }
+        } catch { /* non-fatal */ }
+        return interaction.followUp({
+          embeds: [new EmbedBuilder().setColor(config.embeds.color).setDescription(`❌ Removed **${indices.length}** track(s) from the queue.`)],
+          ephemeral: true,
+        });
+      }
+
       return;
     }
 
@@ -357,9 +556,11 @@ module.exports = (client) => {
         const setupInfo = getSetup(guild.id);
         const player = client.manager.players.get(guild.id);
         const controlMsgId = player?.data?.get('controlMessageId');
+        // setup_vol_down / setup_vol_up arrive from the ephemeral volume panel — allow from any message
+        const isVolumeBtn = customId === 'setup_vol_down' || customId === 'setup_vol_up';
         const isSetupMsg = setupInfo && interaction.message.id === setupInfo.messageId;
         const isControlMsg = controlMsgId && interaction.message.id === controlMsgId;
-        if (!isSetupMsg && !isControlMsg) {
+        if (!isVolumeBtn && !isSetupMsg && !isControlMsg) {
           return interaction.reply({ embeds: [buildErrorEmbed('Setup panel not found.')], ephemeral: true });
         }
 
@@ -434,16 +635,43 @@ module.exports = (client) => {
         }
 
         if (customId === 'setup_vol_down') {
-          await interaction.deferUpdate();
           const newVol = Math.max(0, (player.volume ?? 100) - 10);
           await player.setVolume(newVol).catch(() => {});
+          // Update the ephemeral volume message if possible, otherwise defer
+          try {
+            await interaction.update({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(config.embeds.color)
+                  .setTitle('🔊 Volume Control')
+                  .setDescription(`Current volume: **${newVol}%**\nUse the buttons below to adjust.`)
+                  .setFooter({ text: config.embeds.footerText }),
+              ],
+              components: interaction.message.components,
+            });
+          } catch {
+            await interaction.deferUpdate().catch(() => {});
+          }
           return;
         }
 
         if (customId === 'setup_vol_up') {
-          await interaction.deferUpdate();
           const newVol = Math.min(200, (player.volume ?? 100) + 10);
           await player.setVolume(newVol).catch(() => {});
+          try {
+            await interaction.update({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(config.embeds.color)
+                  .setTitle('🔊 Volume Control')
+                  .setDescription(`Current volume: **${newVol}%**\nUse the buttons below to adjust.`)
+                  .setFooter({ text: config.embeds.footerText }),
+              ],
+              components: interaction.message.components,
+            });
+          } catch {
+            await interaction.deferUpdate().catch(() => {});
+          }
           return;
         }
 
