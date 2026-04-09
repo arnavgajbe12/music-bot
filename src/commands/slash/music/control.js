@@ -1,11 +1,11 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('../../../utils/embeds');
 const {
-  buildSetupNowPlayingV2,
-  buildSetupQueueViewV2,
-  buildSetupIdleV2,
+  buildNowPlayingV2,
+  buildIdleV2,
   extractDominantColor,
 } = require('../../../utils/componentBuilder');
+const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,22 +25,15 @@ module.exports = {
 
     let payload;
     const track = player.queue.current;
+    const settings = getSettings(interaction.guild.id);
 
     if (track) {
       const artUrl = track.thumbnail || track.artworkUrl || null;
       const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
       player.data.set('accentColor', accentColor);
-
-      const isQueueView = player.data.get('setupQueueView') === true;
-      if (isQueueView) {
-        const tracks = [...player.queue];
-        const qPage = player.data.get('setupQueuePage') || 1;
-        payload = buildSetupQueueViewV2(track, tracks, qPage, accentColor, player);
-      } else {
-        payload = buildSetupNowPlayingV2(track, player, accentColor);
-      }
+      payload = buildNowPlayingV2(track, player, settings.largeArt);
     } else {
-      payload = buildSetupIdleV2();
+      payload = buildIdleV2(null, settings.largeArt);
     }
 
     // Delete the old control message if one exists

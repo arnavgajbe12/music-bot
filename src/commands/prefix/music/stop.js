@@ -22,8 +22,9 @@ module.exports = {
     player.queue.clear();
     await player.destroy().catch(() => {});
 
-    return message.reply({
+    return message.channel.send({
       embeds: [buildEmbed(`${config.emojis.stop} Stopped the music and cleared the queue.`)],
+      allowedMentions: { repliedUser: false },
     });
   },
 };

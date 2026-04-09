@@ -18,6 +18,7 @@ const {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   MessageFlags,
+  EmbedBuilder,
 } = require('discord.js');
 const Vibrant = require('node-vibrant');
 const config = require('../../config');
@@ -188,26 +189,28 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
-  // Dynamic small status line shown above the (large) song title
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+
+  // Item 3: top header includes title hyperlink — "<emoji> **Now Playing** - [Title](url)"
+  const titleLink = track.uri ? `[${track.title}](${track.uri})` : track.title;
   const statusText = isPaused
-    ? `${platformEmoji} **Paused**${loopMode}`
-    : `${platformEmoji} **Now Playing**${loopMode}`;
+    ? `${platformEmoji} **Paused** - ${titleLink}${loopMode}`
+    : `${platformEmoji} **Now Playing** - ${titleLink}${loopMode}`;
 
   const container = new ContainerBuilder();
 
-  // Apply dynamic accent color if available
+  // Apply dynamic accent color if available (left color stripe)
   const accentColor = player.data?.get('accentColor');
   if (accentColor != null) container.setAccentColor(accentColor);
 
-  // Small dynamic status header
+  // Header with title hyperlink
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(statusText),
   );
 
+  // Detail text without title (title is in the header line)
   const detailText =
-    `## ${track.title}\n` +
     `🎤  ${track.author || 'Unknown'}\n` +
     `${platformEmoji}: ${sourceDisplay}\n` +
     `⏱️  ${formatDuration(track.length)}\n` +
@@ -580,14 +583,15 @@ const SETUP_QUEUE_PAGE_SIZE = 4;
  *   **Title** - Artist
  *   -# `absIdx`・@requester
  *
- * @param {object} currentTrack - KazagumoTrack (currently playing)
- * @param {object[]} tracks     - Upcoming tracks array
- * @param {number} page         - Current page (1-based)
- * @param {number} accentColor  - Pre-computed accent color (integer)
- * @param {object} player       - KazagumoPlayer (for control buttons state)
+ * @param {object} currentTrack     - KazagumoTrack (currently playing)
+ * @param {object[]} tracks         - Upcoming tracks array
+ * @param {number} page             - Current page (1-based)
+ * @param {number} accentColor      - Pre-computed accent color (integer)
+ * @param {object} player           - KazagumoPlayer (for control buttons state)
+ * @param {object[]} [recommendations] - Optional array of recommended KazagumoTracks (max 10)
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
-function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, player) {
+function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, player, recommendations) {
   const totalPages = Math.max(1, Math.ceil(tracks.length / SETUP_QUEUE_PAGE_SIZE));
   const clampedPage = Math.min(Math.max(1, page), totalPages);
   const start = (clampedPage - 1) * SETUP_QUEUE_PAGE_SIZE;
@@ -665,6 +669,30 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
 
   container.addSeparatorComponents(new SeparatorBuilder());
 
+  // ── Recommendations dropdown (item 8) ─────────────────────────────────────
+  if (Array.isArray(recommendations) && recommendations.length > 0) {
+    const recOptions = recommendations.slice(0, 10).map((t, i) => {
+      const raw = t.title || 'Unknown';
+      const label = raw.length > SELECT_OPTION_MAX_LENGTH ? raw.slice(0, SELECT_OPTION_MAX_LENGTH - 3) + '...' : raw;
+      const rawDesc = `${t.author || 'Unknown'} — ${formatDuration(t.length)}`;
+      const desc = rawDesc.length > SELECT_OPTION_MAX_LENGTH ? rawDesc.slice(0, SELECT_OPTION_MAX_LENGTH - 3) + '...' : rawDesc;
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(label)
+        .setDescription(desc)
+        // Only the index is needed — track is retrieved from player.data.get('setupRecommendations')[i]
+        .setValue(`rec:${i}`);
+    });
+
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('setup_recommend_select')
+          .setPlaceholder('✨ Recommend — Add a related song to queue')
+          .addOptions(recOptions),
+      ),
+    );
+  }
+
   // Control Row 1 (Previous, Pause, Skip, Stop)
   container.addActionRowComponents(buildSetupButtonsV2(player));
   // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up)
@@ -674,6 +702,55 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
     components: [container],
     flags: MessageFlags.IsComponentsV2,
   };
+}
+
+/**
+ * Build the Now Playing rich embed for the /nowplaying and !np commands.
+ * Always uses a small thumbnail (no large art), never ComponentV2.
+ * Includes Artists, Progress, Source, Requested By fields.
+ * @param {object} track - KazagumoTrack
+ * @param {object} player - KazagumoPlayer
+ * @returns {{ embeds: EmbedBuilder[] }}
+ */
+function buildNowPlayingEmbed(track, player) {
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
+  const sourceDisplay = resolveSourceDisplayName(track.sourceName);
+  const requester = track.requester;
+  const requesterMention = requester ? `<@${requester.id}>` : 'Unknown';
+  const requesterName = requester
+    ? requester.displayName || requester.username || requester.tag || 'Unknown'
+    : 'Unknown';
+  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  // Always use a 1:1 thumbnail for the embed
+  const isYTM = (track.sourceName || '').toLowerCase() === 'youtubemusic';
+  const thumbUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+
+  const isPaused = player.paused;
+  const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
+  const position = player.position || 0;
+  const total = track.length || 0;
+  const progressStr = `${formatDuration(position)} / ${formatDuration(total)}`;
+
+  const accentColor = player.data?.get('accentColor');
+
+  const embed = new EmbedBuilder()
+    .setColor(accentColor ?? config.embeds.color)
+    .setAuthor({ name: `${platformEmoji} Now Playing${loopMode}` })
+    .setTitle(track.title)
+    .setURL(track.uri || null)
+    .setThumbnail(thumbUrl)
+    .addFields(
+      { name: '🎤 Artists', value: track.author || 'Unknown', inline: true },
+      { name: '⏱️ Duration', value: formatDuration(total), inline: true },
+      { name: '📊 Progress', value: isPaused ? `⏸️ ${progressStr}` : `▶️ ${progressStr}`, inline: true },
+      { name: `${platformEmoji} Source`, value: sourceDisplay, inline: true },
+      { name: '👤 Requested By', value: `${requesterName}`, inline: true },
+      { name: '📋 Queue', value: player.queue.length > 0 ? `${player.queue.length} track(s)` : 'Nothing', inline: true },
+    )
+    .setFooter({ text: config.embeds.footerText })
+    .setTimestamp();
+
+  return { embeds: [embed] };
 }
 
 /**
@@ -1044,6 +1121,7 @@ module.exports = {
   buildMoreOptionsDropdown,
   buildNowPlayingV2,
   buildNowPlayingV2NoButtons,
+  buildNowPlayingEmbed,
   buildAddedToQueueV2,
   buildAddedPlaylistV2,
   buildIdleV2,
