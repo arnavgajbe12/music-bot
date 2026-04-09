@@ -162,13 +162,15 @@ function buildMoreOptionsDropdown() {
 // ─── Component v2 Panel Builders ──────────────────────────────────────────────
 
 /**
- * Determine whether to show a track's thumbnail as 1:1 (YouTube Music) or 16:9 (others).
- * Returns 'square' for YouTube Music, 'wide' for everything else.
+ * Determine whether to show a track's thumbnail as 1:1 or 16:9.
+ * Only YouTube (video, i.e. ytsearch: results) gets 16:9.
+ * Everything else — YouTube Music, Spotify, JioSaavn, SoundCloud, etc. — gets 1:1.
  * @param {string} sourceName
  * @returns {'square'|'wide'}
  */
 function getThumbnailDisplayMode(sourceName) {
-  return (sourceName || '').toLowerCase() === 'youtubemusic' ? 'square' : 'wide';
+  // Only plain YouTube (from ytsearch:) uses 16:9
+  return (sourceName || '').toLowerCase() === 'youtube' ? 'wide' : 'square';
 }
 
 /**
@@ -185,14 +187,13 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
-  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
-  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+  const isWide = getThumbnailDisplayMode(track.sourceName) === 'wide';
+  const rawArtUrl = getBestThumbnailUrl(track);
+  const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
 
-  // Item 3: top header includes title hyperlink — "<emoji> **Now Playing** - [Title](url)"
   const titleLink = track.uri ? `[${track.title}](${track.uri})` : track.title;
   const statusText = isPaused
     ? `${platformEmoji} **Paused** - ${titleLink}${loopMode}`
@@ -200,16 +201,14 @@ function buildNowPlayingV2(track, player, largeArt = true) {
 
   const container = new ContainerBuilder();
 
-  // Apply dynamic accent color if available (left color stripe)
   const accentColor = player.data?.get('accentColor');
   if (accentColor != null) container.setAccentColor(accentColor);
 
-  // Header with title hyperlink
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(statusText),
   );
 
-  // Detail text without title (title is in the header line)
+  // Detail text (no title — title is added separately as large text below image)
   const detailText =
     `🎤  ${track.author || 'Unknown'}\n` +
     `${platformEmoji}: ${sourceDisplay}\n` +
@@ -217,23 +216,29 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     `👤  ${requesterName}`;
 
   if (largeArt) {
-    if (isYTM) {
-      // YouTube Music: 1:1 square thumbnail as section accessory
-      const section = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-      container.addSectionComponents(section);
-    } else {
-      // YouTube/other: 16:9 gallery image
+    if (isWide) {
+      // YouTube explicit search: 16:9 gallery + Song Title in large text below image (item #8)
       container.addMediaGalleryComponents(
         new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
       );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`## ${track.title}`),
+      );
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
+    } else {
+      // All other sources: 1:1 square thumbnail as section accessory
+      // Song Title in large text + detail text combined in section
+      const sectionText = `## ${track.title}\n${detailText}`;
+      const section = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(sectionText))
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
+      container.addSectionComponents(section);
     }
   } else {
-    // Small thumbnail in a section accessory (always 1:1 in this mode)
+    // Small thumbnail mode — always 1:1
+    const sectionText = `## ${track.title}\n${detailText}`;
     const section = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(sectionText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
     container.addSectionComponents(section);
   }
