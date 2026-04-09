@@ -356,7 +356,7 @@ function buildSetupDisabledButtonsV2() {
 
 /**
  * Build Row 2 of the Setup Channel controls:
- * Queue (🎛️), Shuffle (🔀), Vol Down (🔉), Vol Up (🔊).
+ * Queue (🎛️ Queue), Shuffle (🔀 Shuffle) — both with text labels.
  * When isQueueView is true, the Queue button is highlighted green.
  * @param {boolean} [isQueueView=false]
  * @returns {ActionRowBuilder}
@@ -366,18 +366,12 @@ function buildSetupRow2V2(isQueueView = false) {
     new ButtonBuilder()
       .setCustomId('setup_queue')
       .setEmoji('🎛️')
+      .setLabel('Queue')
       .setStyle(isQueueView ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('setup_shuffle')
       .setEmoji(config.emojis.shuffle)
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_down')
-      .setEmoji(config.emojis.volumeDown)
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_up')
-      .setEmoji(config.emojis.volumeUp)
+      .setLabel('Shuffle')
       .setStyle(ButtonStyle.Secondary),
   );
 }
@@ -391,23 +385,68 @@ function buildSetupRow2DisabledV2() {
     new ButtonBuilder()
       .setCustomId('setup_queue')
       .setEmoji('🎛️')
+      .setLabel('Queue')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
       .setCustomId('setup_shuffle')
       .setEmoji(config.emojis.shuffle)
+      .setLabel('Shuffle')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_down')
-      .setEmoji(config.emojis.volumeDown)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('setup_vol_up')
-      .setEmoji(config.emojis.volumeUp)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
+  );
+}
+
+/**
+ * Build Row 3 of the Setup Channel: Controls dropdown.
+ * Options: Loop Track, Loop Queue, Volume (hidden embed), Disconnect.
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupControlsDropdownV2() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('setup_controls')
+      .setPlaceholder('⚙️ Controls')
+      .addOptions([
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Loop Track')
+          .setEmoji('🔂')
+          .setDescription('Toggle track loop on/off')
+          .setValue('loop_track'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Loop Queue')
+          .setEmoji('🔁')
+          .setDescription('Toggle queue loop on/off')
+          .setValue('loop_queue'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Volume')
+          .setEmoji('🔊')
+          .setDescription('Show and adjust current volume')
+          .setValue('volume_info'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Disconnect')
+          .setEmoji('👋')
+          .setDescription('Disconnect the bot from the voice channel')
+          .setValue('disconnect'),
+      ]),
+  );
+}
+
+/**
+ * Build Row 3 disabled Controls dropdown (for idle panel).
+ * @returns {ActionRowBuilder}
+ */
+function buildSetupControlsDropdownDisabledV2() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('setup_controls')
+      .setPlaceholder('⚙️ Controls')
+      .setDisabled(true)
+      .addOptions([
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Controls')
+          .setValue('disabled'),
+      ]),
   );
 }
 
@@ -440,14 +479,15 @@ function getSquareThumbnailUrl(url) {
  *
  * Layout:
  *  - Dynamic accent color (extracted from thumbnail, random on failure)
- *  - TextDisplay: 🎵 Now Playing + -# [Song Title hyperlink]  (header — item 5)
- *  - Thumbnail: 1:1 square for YouTube Music, 16:9 gallery for others  (item 2)
+ *  - TextDisplay: 🎵 Now Playing + -# [Song Title hyperlink]  (header)
+ *  - Thumbnail: 1:1 square for YouTube Music, 16:9 gallery for others
  *  - ### ♪  [Song Title]
  *  - [Artist]
  *  - -# [Total Length]  (or -# [Progress] / [Total Length] when paused)
  *  - Separator
  *  - Row 1: Prev | Pause | Skip | Stop
- *  - Row 2: Queue | Shuffle | Vol Down | Vol Up
+ *  - Row 2: Queue (with text) | Shuffle (with text)
+ *  - Row 3: Controls dropdown (Loop Track, Loop Queue, Volume, Disconnect)
  *
  * @param {object} track  - KazagumoTrack
  * @param {object} player - KazagumoPlayer
@@ -522,6 +562,7 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupButtonsV2(player));
   container.addActionRowComponents(buildSetupRow2V2(false));
+  container.addActionRowComponents(buildSetupControlsDropdownV2());
 
   return {
     components: [container],
@@ -555,6 +596,7 @@ function buildSetupIdleV2() {
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupDisabledButtonsV2());
   container.addActionRowComponents(buildSetupRow2DisabledV2());
+  container.addActionRowComponents(buildSetupControlsDropdownDisabledV2());
 
   return {
     components: [container],
@@ -601,7 +643,8 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // Navigation row at the TOP (per user request)
+  // Navigation row at the TOP — includes prev/next page buttons and a jump-to-last/first button
+  const isOnLastPage = clampedPage >= totalPages;
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -614,6 +657,12 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
         .setEmoji('\u2b07\ufe0f')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(clampedPage >= totalPages),
+      // ⏬ jump to last page (turns into ⏫ to jump to first when already on last page)
+      new ButtonBuilder()
+        .setCustomId(isOnLastPage ? 'setup_queue_nav:1' : `setup_queue_nav:${totalPages}`)
+        .setEmoji(isOnLastPage ? '\u23eb' : '\u23ec')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(totalPages <= 1),
     ),
   );
 
@@ -632,7 +681,7 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
     currentDurLine = `-# ${currentTotalDur}`;
   }
 
-  // Absolute index of the currently playing track (item 7)
+  // Absolute index of the currently playing track
   const currentAbsIdx = player.data?.get('absoluteQueueIndex') ?? 1;
   const currentRequesterId = currentTrack.requester?.id || null;
   const currentRequesterStr = currentRequesterId ? `<@${currentRequesterId}>` : '';
@@ -669,7 +718,41 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
 
   container.addSeparatorComponents(new SeparatorBuilder());
 
-  // ── Recommendations dropdown (item 8) ─────────────────────────────────────
+  // ── Manage Queue dropdown ──────────────────────────────────────────────────
+  const manageOptions = [
+    new StringSelectMenuOptionBuilder()
+      .setLabel('Clear Queue')
+      .setEmoji('🗑️')
+      .setDescription('Remove all upcoming tracks from the queue')
+      .setValue('clear_queue'),
+    new StringSelectMenuOptionBuilder()
+      .setLabel('Reverse Queue')
+      .setEmoji('🔃')
+      .setDescription('Reverse the order of upcoming tracks')
+      .setValue('reverse_queue'),
+  ];
+
+  // Only show Remove option when there are upcoming tracks
+  if (tracks.length > 0) {
+    manageOptions.push(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Remove Tracks')
+        .setEmoji('❌')
+        .setDescription('Select specific tracks to remove from the queue')
+        .setValue('remove_tracks'),
+    );
+  }
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('setup_manage_queue')
+        .setPlaceholder('🎚️ Manage Queue')
+        .addOptions(manageOptions),
+    ),
+  );
+
+  // ── Recommendations dropdown ───────────────────────────────────────────────
   if (Array.isArray(recommendations) && recommendations.length > 0) {
     const recOptions = recommendations.slice(0, 10).map((t, i) => {
       const raw = t.title || 'Unknown';
@@ -679,7 +762,6 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
       return new StringSelectMenuOptionBuilder()
         .setLabel(label)
         .setDescription(desc)
-        // Only the index is needed — track is retrieved from player.data.get('setupRecommendations')[i]
         .setValue(`rec:${i}`);
     });
 
@@ -695,8 +777,10 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
 
   // Control Row 1 (Previous, Pause, Skip, Stop)
   container.addActionRowComponents(buildSetupButtonsV2(player));
-  // Control Row 2 (Queue [green], Shuffle, Vol Down, Vol Up)
+  // Control Row 2 (Queue [green], Shuffle)
   container.addActionRowComponents(buildSetupRow2V2(true));
+  // Control Row 3 (Controls dropdown)
+  container.addActionRowComponents(buildSetupControlsDropdownV2());
 
   return {
     components: [container],
@@ -1131,6 +1215,8 @@ module.exports = {
   buildSetupDisabledButtonsV2,
   buildSetupRow2V2,
   buildSetupRow2DisabledV2,
+  buildSetupControlsDropdownV2,
+  buildSetupControlsDropdownDisabledV2,
   buildSetupQueueViewV2,
   extractDominantColor,
   getSquareThumbnailUrl,
