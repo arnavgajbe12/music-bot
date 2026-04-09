@@ -22,6 +22,9 @@ module.exports = {
       ],
     });
 
+    // Skip error message if this was an intentional disconnect/destroy
+    if (player.data?.get('intentionalDisconnect')) return;
+
     const channelId = player.data.get('textChannel');
     if (!channelId) return;
 
