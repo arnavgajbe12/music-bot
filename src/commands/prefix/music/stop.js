@@ -11,12 +11,12 @@ module.exports = {
   async run(client, message) {
     const player = client.manager.players.get(message.guild.id);
     if (!player) {
-      return message.reply({ embeds: [buildErrorEmbed('There is no active player.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is no active player.')] });
     }
 
     const voiceCheck = checkVoice(message.member, message.guild, player);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     player.queue.clear();

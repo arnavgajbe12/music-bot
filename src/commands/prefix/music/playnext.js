@@ -11,17 +11,17 @@ module.exports = {
 
   async run(client, message, args) {
     if (!args.length) {
-      return message.reply({ embeds: [buildErrorEmbed('Please provide a song name or URL.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Please provide a song name or URL.')] });
     }
 
     const voiceCheck = checkVoice(message.member, message.guild);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const player = client.manager.players.get(message.guild.id);
     if (!player || !player.queue.current) {
-      return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now. Use `' + config.botSetup.prefix + 'play` to start the queue first.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is nothing playing right now. Use `' + config.botSetup.prefix + 'play` to start the queue first.')] });
     }
 
     const rawQuery = args.join(' ');
@@ -35,11 +35,11 @@ module.exports = {
       // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
       result = await client.manager.search(query, { requester: message.author, source: '' });
     } catch {
-      return message.reply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
     }
 
     if (!result || !result.tracks.length) {
-      return message.reply({ embeds: [buildErrorEmbed('No results found for that query.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('No results found for that query.')] });
     }
 
     const track = result.tracks[0];
@@ -48,7 +48,7 @@ module.exports = {
     player.queue.unshift(track);
 
     const payload = buildPlayNextConfirmV2(track);
-    const reply = await message.reply(payload);
+    const reply = await message.channel.send(payload);
     setTimeout(() => reply.delete().catch(() => {}), PLAY_NEXT_DELETE_DELAY_MS);
   },
 };

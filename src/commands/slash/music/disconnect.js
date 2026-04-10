@@ -23,13 +23,20 @@ module.exports = {
 
     const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
-    // Clear queue and destroy player (Kazagumo destroy also handles VC leave via Shoukaku)
+    // Mark as intentional so voiceStateUpdate doesn't double-destroy
     player.data.set('intentionalDisconnect', true);
     player.queue.clear();
     try {
+      // Explicitly release Shoukaku's WebRTC session before Kazagumo destroy
+      // to prevent ghost sessions on the Lavalink node.
+      const shoukakuPlayer = player.shoukaku;
+      if (shoukakuPlayer) {
+        await shoukakuPlayer.node.destroyPlayer(interaction.guild.id).catch(() => {});
+        await client.manager.shoukaku.leaveVoiceChannel(interaction.guild.id).catch(() => {});
+      }
       await player.destroy();
     } catch {
-      // Ignore errors from destroy – Shoukaku handles the actual disconnect
+      // Best-effort cleanup
     }
 
     const payload = buildConfirmV2(`👋 Left **${channelName}** and cleared the queue.`, 0xed4245);

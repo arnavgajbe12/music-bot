@@ -5,6 +5,10 @@
  *  - settings.json → per-guild feature toggles (largeArt, autoplay, mode247)
  *  - noprefix.json → users granted no-prefix access (with optional expiry)
  *  - prefix.json   → per-guild custom prefixes
+ *
+ * Performance: all reads are served from an in-memory cache that is populated
+ * on first access. Writes use atomic rename (write to .tmp then rename) to
+ * prevent JSON corruption if the process crashes mid-write.
  */
 
 const fs = require('fs');
@@ -16,25 +20,56 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const NOPREFIX_FILE = path.join(DATA_DIR, 'noprefix.json');
 const PREFIX_FILE = path.join(DATA_DIR, 'prefix.json');
 
+// ── In-memory cache ───────────────────────────────────────────────────────────
+// Each entry is { data: object, loaded: boolean }
+const _cache = {
+  [SETUP_FILE]: null,
+  [SETTINGS_FILE]: null,
+  [NOPREFIX_FILE]: null,
+  [PREFIX_FILE]: null,
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+/**
+ * Read JSON from cache, loading from disk on first access.
+ * All subsequent calls are served from memory — zero disk I/O.
+ */
 function readJSON(file) {
+  if (_cache[file] !== null) return _cache[file];
   ensureDir();
-  if (!fs.existsSync(file)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return {};
+  if (!fs.existsSync(file)) {
+    _cache[file] = {};
+    return _cache[file];
   }
+  try {
+    _cache[file] = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    _cache[file] = {};
+  }
+  return _cache[file];
 }
 
+/**
+ * Persist JSON to disk using atomic write (tmp → rename) to prevent corruption.
+ * The in-memory cache is updated synchronously; the disk write is async.
+ */
 function writeJSON(file, data) {
+  _cache[file] = data;
   ensureDir();
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+  const tmp = file + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    console.error(`[setupManager] Failed to write ${path.basename(file)}:`, err);
+    // Attempt cleanup of the .tmp file
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+  }
 }
 
 // ── Setup Channel ─────────────────────────────────────────────────────────────

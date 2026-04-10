@@ -28,10 +28,15 @@ module.exports = {
 
       if (lastTrack) {
         try {
-          // Search for a related track using the last played track's artist + title
-          const searchQuery = `ytmsearch:${[lastTrack.author, lastTrack.title].filter(Boolean).join(' ')}`;
-          // Pass source: '' so Kazagumo does not prepend its own prefix on top of the one we set
-          const result = await client.manager.search(searchQuery, { requester: lastTrack.requester, source: '' });
+          // First try "Artist mix" for more variety (avoids returning the exact same song).
+          // Fall back to "Artist Title" search if the mix query yields no results.
+          const mixQuery = `ytmsearch:${[lastTrack.author].filter(Boolean).join(' ')} mix`;
+          const fallbackQuery = `ytmsearch:${[lastTrack.author, lastTrack.title].filter(Boolean).join(' ')}`;
+
+          let result = await client.manager.search(mixQuery, { requester: lastTrack.requester, source: '' });
+          if (!result || !result.tracks || result.tracks.length === 0) {
+            result = await client.manager.search(fallbackQuery, { requester: lastTrack.requester, source: '' });
+          }
           if (result && result.tracks && result.tracks.length > 0) {
             const AUTOPLAY_CANDIDATE_POOL_SIZE = 5;
             // Prefer a track that isn't an exact duplicate

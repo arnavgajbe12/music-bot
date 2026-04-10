@@ -10,7 +10,7 @@ module.exports = {
   async run(client, message, args) {
     const player = client.manager.players.get(message.guild.id);
     if (!player || !player.queue.current) {
-      return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
     const tracks = [...player.queue];
