@@ -11,7 +11,7 @@ module.exports = {
   async run(client, message) {
     const voiceCheck = checkVoice(message.member, message.guild);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const voiceChannel = message.member.voice.channel;
@@ -21,7 +21,7 @@ module.exports = {
     if (existingPlayer) {
       const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
       if (botVoiceChannelId && botVoiceChannelId === voiceChannel.id) {
-        return message.reply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
+        return message.channel.send({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
       }
       existingPlayer.data.set('intentionalDisconnect', true);
       await existingPlayer.destroy().catch(() => {});
@@ -37,7 +37,7 @@ module.exports = {
     player.data.set('textChannel', message.channel.id);
 
     const payload = buildConfirmV2(`✅ Joined **${voiceChannel.name}**!`, 0x57f287);
-    const reply = await message.reply(payload);
+    const reply = await message.channel.send(payload);
     setTimeout(() => reply.delete().catch(() => {}), 10000);
   },
 };

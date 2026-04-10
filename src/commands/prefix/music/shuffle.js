@@ -10,17 +10,17 @@ module.exports = {
   async run(client, message) {
     const player = client.manager.players.get(message.guild.id);
     if (!player || !player.queue.current) {
-      return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
     const voiceCheck = checkVoice(message.member, message.guild, player);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const tracks = player.queue.tracks ?? [];
     if (tracks.length < 2) {
-      return message.reply({ embeds: [buildErrorEmbed('There are not enough tracks in the queue to shuffle.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There are not enough tracks in the queue to shuffle.')] });
     }
 
     for (let i = tracks.length - 1; i > 0; i--) {
@@ -28,7 +28,7 @@ module.exports = {
       [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
     }
 
-    return message.reply({
+    return message.channel.send({
       embeds: [buildEmbed(`${config.emojis.shuffle} Shuffled **${tracks.length}** tracks in the queue.`)],
     });
   },

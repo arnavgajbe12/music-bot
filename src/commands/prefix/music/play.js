@@ -12,12 +12,12 @@ module.exports = {
 
   async run(client, message, args) {
     if (!args.length) {
-      return message.reply({ embeds: [buildErrorEmbed('Please provide a song name or URL.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Please provide a song name or URL.')] });
     }
 
     const voiceCheck = checkVoice(message.member, message.guild);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const rawQuery = args.join(' ');

@@ -11,22 +11,22 @@ module.exports = {
   async run(client, message) {
     const player = client.manager.players.get(message.guild.id);
     if (!player || !player.queue.current) {
-      return message.reply({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is nothing playing right now.')] });
     }
 
     const voiceCheck = checkVoice(message.member, message.guild, player);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const count = player.queue.size;
     if (count === 0) {
-      return message.reply({ embeds: [buildErrorEmbed('The queue is already empty.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('The queue is already empty.')] });
     }
 
     player.queue.clear();
 
-    return message.reply({
+    return message.channel.send({
       embeds: [buildEmbed(`${config.emojis.stop} Cleared **${count}** track(s) from the queue.`)],
     });
   },

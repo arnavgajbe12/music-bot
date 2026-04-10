@@ -53,6 +53,7 @@ client.manager = new Kazagumo(
     resume: false,
     resumeTimeout: 30,
     reconnectTries: 2,
+    reconnectInterval: 5000,
     restTimeout: 60,
   }
 );
@@ -77,16 +78,22 @@ process.on('unhandledRejection', async (error) => {
   }
 });
 
-process.on('uncaughtException', async (error) => {
+process.on('uncaughtException', (error) => {
   console.error('[UncaughtException]', error);
   if (process.env.ERROR_WEBHOOK_URL) {
     try {
       const webhook = new WebhookClient({ url: process.env.ERROR_WEBHOOK_URL });
-      await webhook.send({
+      // Fire-and-forget the webhook send; the 500ms grace window below ensures
+      // it has time to complete before the process actually exits.
+      webhook.send({
         content: `**[UncaughtException]**\n\`\`\`js\n${String(error).slice(0, 1900)}\n\`\`\``,
-      });
+      }).catch(() => {});
     } catch (_) {}
   }
+  // Give the async webhook send ~500ms to complete before we exit.
+  // Node.js does NOT await async uncaughtException handlers, so without this
+  // grace window the process would exit before the webhook ever fires.
+  setTimeout(() => process.exit(1), 500);
 });
 
 // ─── Login ───────────────────────────────────────────────────────────────────────

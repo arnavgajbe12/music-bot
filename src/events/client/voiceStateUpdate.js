@@ -3,11 +3,13 @@
  * Handles the Discord voiceStateUpdate client event.
  *
  * Key fix: when the bot is manually removed from a voice channel by a user,
- * immediately destroy the Kazagumo player so the next !play / /play can
- * create a fresh player and actually rejoin the VC.
+ * immediately destroy the Kazagumo player AND release Shoukaku's internal
+ * WebRTC session so the next !play / /play can create a fresh player and
+ * actually rejoin the VC.
  *
- * Without this handler the player object lingers and subsequent play commands
- * appear to start (the bot "thinks" it's playing) but never actually join VC.
+ * Without fully releasing the Shoukaku session the Lavalink node still holds
+ * a "connected" ghost session even after Kazagumo's player map is cleared,
+ * causing the bot to ghost-play without being in a channel.
  */
 
 const { logToWebhook } = require('../../utils/webhookLogger');
@@ -42,6 +44,22 @@ module.exports = {
           return;
         }
         try {
+          // Explicitly release Shoukaku's internal WebRTC session BEFORE destroying
+          // the Kazagumo player. Without this the Lavalink node keeps a ghost
+          // "connected" session even after the Kazagumo player map is cleared,
+          // which causes ghost-playing and prevents rejoining the VC.
+          try {
+            const shoukakuPlayer = player.shoukaku;
+            if (shoukakuPlayer) {
+              // destroyPlayer tells the Lavalink node to drop its session for this guild
+              await shoukakuPlayer.node.destroyPlayer(guildId).catch(() => {});
+              // leaveVoiceChannel sends the Discord gateway VOICE_STATE_UPDATE to
+              // instruct Discord's servers to fully release the WebRTC session
+              await client.manager.shoukaku.leaveVoiceChannel(guildId).catch(() => {});
+            }
+          } catch {
+            // Non-fatal – continue with Kazagumo destroy regardless
+          }
           await player.destroy();
           console.log(`[VoiceStateUpdate] Player destroyed for guild "${guildId}".`);
         } catch (err) {

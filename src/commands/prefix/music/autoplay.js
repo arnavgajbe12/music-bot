@@ -11,7 +11,7 @@ module.exports = {
   async run(client, message) {
     const voiceCheck = checkVoice(message.member, message.guild);
     if (!voiceCheck.ok) {
-      return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+      return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
     }
 
     const settings = getSettings(message.guild.id);
@@ -26,7 +26,7 @@ module.exports = {
       player.data.set('autoplay', newVal);
     }
 
-    return message.reply({
+    return message.channel.send({
       embeds: [
         buildEmbed(
           newVal

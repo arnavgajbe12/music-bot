@@ -15,10 +15,10 @@ const DEV_COMMANDS = [
   { name: 'noprefixadd', usage: '!noprefixadd @user <time|permanent>', desc: 'Grant a user no-prefix access.' },
   { name: 'noprefix remove', usage: '!noprefix remove @user', desc: 'Revoke no-prefix access from a user.' },
   { name: 'noprefix list', usage: '!noprefix list', desc: 'List all no-prefix users.' },
-  { name: 'prefixset', usage: '!prefixset <prefix>', desc: 'Overwrite the guild prefix.' },
-  { name: 'prefixadd', usage: '!prefixadd <prefix>', desc: 'Add an additional guild prefix.' },
-  { name: 'prefixremove', usage: '!prefixremove <prefix>', desc: 'Remove a guild prefix.' },
-  { name: 'prefixlist', usage: '!prefixlist', desc: 'List all active guild prefixes.' },
+  { name: '/prefix set', usage: '/prefix set <prefix>', desc: 'Overwrite the guild prefix (slash command).' },
+  { name: '/prefix add', usage: '/prefix add <prefix>', desc: 'Add an additional guild prefix (slash command).' },
+  { name: '/prefix remove', usage: '/prefix remove <prefix>', desc: 'Remove a guild prefix (slash command).' },
+  { name: '/prefix list', usage: '/prefix list', desc: 'List all active guild prefixes (slash command).' },
 ];
 
 module.exports = {
@@ -40,10 +40,10 @@ module.exports = {
     try {
       const dmChannel = await message.author.createDM();
       await dmChannel.send(dmContent);
-      const reply = await message.reply({ embeds: [{ color: 0x57f287, description: '📬 Developer commands sent to your DMs.' }] });
+      const reply = await message.channel.send({ embeds: [{ color: 0x57f287, description: '📬 Developer commands sent to your DMs.' }] });
       setTimeout(() => reply.delete().catch(() => {}), 5000);
     } catch {
-      await message.reply({ embeds: [buildErrorEmbed('Could not send you a DM. Please enable DMs from server members.')] });
+      await message.channel.send({ embeds: [buildErrorEmbed('Could not send you a DM. Please enable DMs from server members.')] });
     }
   },
 };

@@ -17,7 +17,7 @@ module.exports = {
     const player = client.manager.players.get(message.guild.id);
 
     if (!player) {
-      return message.reply({ embeds: [buildErrorEmbed('There is no active player. Start playing a song first.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('There is no active player. Start playing a song first.')] });
     }
 
     let payload;

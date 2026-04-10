@@ -86,12 +86,19 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
       if (result.type === 'PLAYLIST') {
         for (const track of result.tracks) player.queue.add(track);
         if (!wasIdle) {
-          const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
+          // Prefer artworkUrl (1:1 square album art) over thumbnail (16:9 video) for non-yt sources.
+          // For yt (useWide=true), keep thumbnail priority so the 16:9 art is used.
+          const firstTrack = result.tracks[0];
+          const artUrl = useWide
+            ? (firstTrack?.thumbnail || firstTrack?.artworkUrl)
+            : (firstTrack?.artworkUrl || firstTrack?.thumbnail);
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
           await interaction.editReply(payload);
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           return;
         }
+        // wasIdle: must editReply before deleteReply (Discord API requirement for deferred replies)
+        await interaction.editReply({ content: '▶️ Playing playlist...' }).catch(() => {});
         await interaction.deleteReply().catch(() => {});
       } else {
         const track = result.tracks[0];
@@ -103,6 +110,8 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           return;
         }
+        // wasIdle: must editReply before deleteReply
+        await interaction.editReply({ content: '▶️ Playing...' }).catch(() => {});
         await interaction.deleteReply().catch(() => {});
       }
 
