@@ -38,11 +38,14 @@ module.exports = (client) => {
     // ── Autocomplete ───────────────────────────────────────────────────────
     if (interaction.isAutocomplete()) {
       const command = client.slashCommands.get(interaction.commandName);
-      if (!command?.autocomplete) return;
+      if (!command?.autocomplete) {
+        return interaction.respond([]).catch(() => {});
+      }
       try {
         await command.autocomplete(client, interaction);
       } catch (error) {
         console.error(`[InteractionHandler] Autocomplete error in "${interaction.commandName}":`, error);
+        interaction.respond([]).catch(() => {});
       }
       return;
     }
@@ -77,6 +80,20 @@ module.exports = (client) => {
           await interaction.update({ embeds: [embed], components: [row] });
         } catch (error) {
           console.error('[InteractionHandler] help_category select error:', error);
+          await interaction.reply({ embeds: [buildErrorEmbed('Could not load that category.')], ephemeral: true }).catch(() => {});
+        }
+        return;
+      }
+
+      // ── Stats dropdown ─────────────────────────────────────────────────────
+      if (interaction.customId === 'stats_category') {
+        try {
+          const { buildStatsPayload } = require('../commands/prefix/general/stats');
+          const selected = interaction.values[0];
+          const payload = buildStatsPayload(client, selected);
+          await interaction.update(payload);
+        } catch (error) {
+          console.error('[InteractionHandler] stats_category select error:', error);
           await interaction.reply({ embeds: [buildErrorEmbed('Could not load that category.')], ephemeral: true }).catch(() => {});
         }
         return;

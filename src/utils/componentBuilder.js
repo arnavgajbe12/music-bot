@@ -164,14 +164,11 @@ function buildMoreOptionsDropdown() {
 /**
  * Determine whether to show a track's thumbnail as 1:1 (square) or 16:9 (wide).
  * Only explicit YouTube searches (!yt / /yt) use 16:9; everything else uses 1:1.
- * Tracks searched via yt commands have `track.requester?.useWide = true` set on the requester,
- * or the track itself has `track.useWide = true`.
+ * Tracks searched via yt commands have `track.useWide = true` set on the track.
  * @param {object} track - KazagumoTrack
  * @returns {'square'|'wide'}
  */
 function getThumbnailDisplayMode(track) {
-  // Legacy fallback: if a plain sourceName string was passed, treat it as non-wide
-  if (typeof track === 'string') return 'square';
   // Only use wide (16:9) if the track was explicitly searched via !yt or /yt
   return track?.useWide === true ? 'wide' : 'square';
 }
@@ -810,7 +807,7 @@ function buildProgressBar(position, total, bars = 10) {
   const progress = Math.min(1, position / total);
   const filled = Math.round(progress * bars);
   const left = '▬'.repeat(Math.max(0, filled));
-  const right = '▬'.repeat(Math.max(0, bars - filled));
+  const right = '▬'.repeat(Math.max(0, bars - filled - 1));
   return `${left}🔘${right}`;
 }
 
