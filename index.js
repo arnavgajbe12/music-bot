@@ -29,6 +29,16 @@ const nodes = [
   },
 ];
 
+// Add secondary node if configured
+if (process.env.LAVA2_HOST) {
+  nodes.push({
+    name: 'Backup',
+    url: `${(process.env.LAVA2_HOST || '').replace(/^https?:\/\/|^wss?:\/\//i, '')}:${process.env.LAVA2_PORT || 2333}`,
+    auth: process.env.LAVA2_PASS,
+    secure: process.env.LAVA2_SECURE === 'true',
+  });
+}
+
 // ─── Kazagumo (Music Manager) ───────────────────────────────────────────────────
 client.manager = new Kazagumo(
   {

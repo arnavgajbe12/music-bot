@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
 const { buildSetupIdleV2 } = require('../../../utils/componentBuilder');
-const { saveSetup, removeSetup } = require('../../../utils/setupManager');
+const { saveSetup, removeSetup, getSetup } = require('../../../utils/setupManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -38,6 +38,20 @@ module.exports = {
       return interaction.editReply({
         embeds: [buildErrorEmbed('Please select a valid text channel.')],
       });
+    }
+
+    // If a setup channel is already configured, try to delete the old panel message
+    const existingSetup = getSetup(interaction.guild.id);
+    if (existingSetup) {
+      try {
+        const oldChannel = client.channels.cache.get(existingSetup.channelId);
+        if (oldChannel?.isTextBased()) {
+          const oldMsg = await oldChannel.messages.fetch(existingSetup.messageId).catch(() => null);
+          if (oldMsg) await oldMsg.delete().catch(() => {});
+        }
+      } catch {
+        // Non-fatal — old panel may already be gone
+      }
     }
 
     const payload = buildSetupIdleV2();

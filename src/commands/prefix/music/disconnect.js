@@ -22,6 +22,7 @@ module.exports = {
     const channelName = message.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
     // Clear queue and destroy player (Kazagumo destroy also triggers VC leave)
+    player.data.set('intentionalDisconnect', true);
     player.queue.clear();
     try {
       await player.destroy();
@@ -41,8 +42,7 @@ module.exports = {
 
     const payload = buildConfirmV2(`👋 Left **${channelName}** and cleared the queue.`, 0xed4245);
     const reply = await message.reply(payload);
-    const timer = setTimeout(() => reply.delete().catch(() => {}), 10000);
-    reply.once('delete', () => clearTimeout(timer));
+    setTimeout(() => reply.delete().catch(() => {}), 10000);
   },
 };
 

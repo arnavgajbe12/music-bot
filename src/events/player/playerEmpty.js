@@ -15,8 +15,14 @@ module.exports = {
 
     console.log(`[playerEmpty] Queue exhausted for guild "${guildId}". Autoplay=${settings.autoplay}`);
 
+    // If bot is not in a voice channel, just clean up and return
+    const botVoiceChannelId = client.guilds.cache.get(guildId)?.members?.me?.voice?.channelId;
+    if (!botVoiceChannelId) {
+      console.warn(`[playerEmpty] Bot is not in a voice channel for guild "${guildId}" — skipping autoplay.`);
+    }
+
     // ── Autoplay: enqueue a related track when queue runs out ────────────────
-    if (settings.autoplay) {
+    if (settings.autoplay && botVoiceChannelId) {
       // player.queue.previous is an Array (most recent first) in Kazagumo 3.x
       const lastTrack = player.queue.previous.length > 0 ? player.queue.previous[0] : null;
 

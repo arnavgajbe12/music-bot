@@ -9,8 +9,11 @@ const { checkVoice } = require('./functions');
  * @param {string} description - Human-readable description
  * @param {string} searchPrefix - Kazagumo/LavaSrc search prefix (e.g. 'ytsearch:')
  * @param {string} platformLabel - Display label (e.g. 'YouTube')
+ * @param {object} [opts={}] - Additional options
+ * @param {boolean} [opts.useWide=false] - Whether tracks from this command use 16:9 thumbnails
  */
-function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel) {
+function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel, opts = {}) {
+  const useWide = opts.useWide === true;
   return {
     data: new SlashCommandBuilder()
       .setName(name)
@@ -73,6 +76,11 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
         return interaction.editReply({ embeds: [buildErrorEmbed(`No results found on ${platformLabel}.`)] });
       }
 
+      // Mark tracks as wide (16:9) if this command uses YouTube search
+      if (useWide) {
+        for (const t of result.tracks) t.useWide = true;
+      }
+
       const wasIdle = !player.playing && !player.paused;
 
       if (result.type === 'PLAYLIST') {
@@ -110,8 +118,11 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
  * @param {string} description - Human-readable description
  * @param {string} searchPrefix - Kazagumo/LavaSrc search prefix (e.g. 'ytsearch:')
  * @param {string} platformLabel - Display label (e.g. 'YouTube')
+ * @param {object} [opts={}] - Additional options
+ * @param {boolean} [opts.useWide=false] - Whether tracks from this command use 16:9 thumbnails
  */
-function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, platformLabel) {
+function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, platformLabel, opts = {}) {
+  const useWide = opts.useWide === true;
   return {
     name,
     aliases,
@@ -177,6 +188,11 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
       if (!result || !result.tracks.length) {
         await searchMsg.edit({ content: `❌ No results found on ${platformLabel}.` }).catch(() => {});
         return;
+      }
+
+      // Mark tracks as wide (16:9) if this command uses YouTube search
+      if (useWide) {
+        for (const t of result.tracks) t.useWide = true;
       }
 
       // Delete the searching message now that we have results

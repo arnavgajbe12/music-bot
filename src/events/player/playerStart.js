@@ -1,6 +1,6 @@
 const { buildNowPlayingV2, buildSetupNowPlayingV2, extractDominantColor } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
-const { logToWebhook } = require('../../utils/webhookLogger');
+const { logTrackStart } = require('../../utils/lavalinkLogger');
 
 module.exports = {
   /**
@@ -13,6 +13,14 @@ module.exports = {
     const settings = getSettings(guildId);
     const setupInfo = getSetup(guildId);
 
+    // ── Ghost-play guard: abort if bot is not in any voice channel ────────────
+    const botVoiceChannelId = client.guilds.cache.get(guildId)?.members?.me?.voice?.channelId;
+    if (!botVoiceChannelId) {
+      console.warn(`[playerStart] Bot is not in a voice channel for guild "${guildId}" — destroying player to prevent ghost play.`);
+      player.destroy().catch(() => {});
+      return;
+    }
+
     // ── Absolute queue index tracking (item 7) ───────────────────────────────
     // Increment a never-resetting counter for each new track
     const prevIdx = player.data.get('absoluteQueueIndex') ?? 0;
@@ -22,19 +30,8 @@ module.exports = {
       `[playerStart] Track started: "${track.title}" by "${track.author}" | source=${track.sourceName} | guild=${guildId} | absIdx=${prevIdx + 1}`,
     );
 
-    // Log track start to webhook for debugging
-    logToWebhook({
-      title: '▶️ Track Started',
-      color: 0x57f287,
-      fields: [
-        { name: 'Guild ID', value: guildId, inline: true },
-        { name: 'Source', value: track.sourceName || 'Unknown', inline: true },
-        { name: 'Track', value: `${track.title} — ${track.author || 'Unknown'}` },
-        { name: 'URI', value: track.uri || 'N/A' },
-        { name: 'Has Setup Channel', value: setupInfo ? `✅ ${setupInfo.channelId}` : '❌ No', inline: true },
-        { name: 'Text Channel', value: player.data.get('textChannel') || 'N/A', inline: true },
-      ],
-    }).catch(() => {});
+    // Log track start to the Lavalink channel (not the error webhook)
+    logTrackStart(client, player, track).catch(() => {});
 
     // Extract dominant color once, reuse for all panels
     const artUrl = track.thumbnail || track.artworkUrl || null;

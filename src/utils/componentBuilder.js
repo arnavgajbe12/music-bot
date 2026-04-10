@@ -162,13 +162,15 @@ function buildMoreOptionsDropdown() {
 // ─── Component v2 Panel Builders ──────────────────────────────────────────────
 
 /**
- * Determine whether to show a track's thumbnail as 1:1 (YouTube Music) or 16:9 (others).
- * Returns 'square' for YouTube Music, 'wide' for everything else.
- * @param {string} sourceName
+ * Determine whether to show a track's thumbnail as 1:1 (square) or 16:9 (wide).
+ * Only explicit YouTube searches (!yt / /yt) use 16:9; everything else uses 1:1.
+ * Tracks searched via yt commands have `track.useWide = true` set on the track.
+ * @param {object} track - KazagumoTrack
  * @returns {'square'|'wide'}
  */
-function getThumbnailDisplayMode(sourceName) {
-  return (sourceName || '').toLowerCase() === 'youtubemusic' ? 'square' : 'wide';
+function getThumbnailDisplayMode(track) {
+  // Only use wide (16:9) if the track was explicitly searched via !yt or /yt
+  return track?.useWide === true ? 'wide' : 'square';
 }
 
 /**
@@ -185,7 +187,7 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const isYTM = getThumbnailDisplayMode(track) === 'square';
   const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
@@ -495,9 +497,9 @@ function getSquareThumbnailUrl(url) {
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
 function buildSetupNowPlayingV2(track, player, accentColor) {
-  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const isWide = getThumbnailDisplayMode(track) === 'wide';
   const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
-  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+  const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const container = new ContainerBuilder();
 
@@ -505,58 +507,62 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   const color = accentColor != null ? accentColor : Math.floor(Math.random() * 0xffffff);
   container.setAccentColor(color);
 
-  // ── Header: "Now Playing" emoji + song title as hyperlink (item 5) ──────────
+  // ── Row 1: <Source emoji> Now Playing - Sr.No. • [Song Title](url) ──────────
+  const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const titleLink = track.uri ? `[${track.title}](${track.uri})` : track.title;
+  const absIdx = player.data?.get('absoluteQueueIndex') ?? 1;
+  const headerLine = `${platformEmoji} Now Playing - ${absIdx} • ${titleLink}`;
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`${config.emojis.music} **Now Playing**\n-# ${titleLink}`),
+    new TextDisplayBuilder().setContent(headerLine),
   );
 
-  // ── Thumbnail: 1:1 for YouTube Music, 16:9 gallery for others (item 2) ──────
-  if (isYTM) {
-    // YouTube Music: section with 1:1 thumbnail accessory
-    const artist = track.author || 'Unknown Artist';
-    const totalDuration = formatDuration(track.length);
-    let durationLine;
-    if (player.paused && player.position > 0) {
-      const progress = formatDuration(player.position);
-      durationLine = `-# ${progress} / ${totalDuration}`;
-    } else {
-      durationLine = `-# ${totalDuration}`;
-    }
-    const trackText = `### ${config.emojis.music}  ${track.title}\n${artist}\n${durationLine}`;
+  // ── Row 2: •(@Requested User) and optional Playlist info ─────────────────────
+  const requester = track.requester;
+  const requesterId = requester?.id;
+  const requesterStr = requesterId ? `•(<@${requesterId}>)` : '';
+  const playlistName = track.playlistName || player.data?.get('currentPlaylistName') || null;
+  const playlistUrl = track.playlistUrl || player.data?.get('currentPlaylistUrl') || null;
+  let row2 = requesterStr;
+  if (playlistName) {
+    const playlistLink = playlistUrl ? `[${playlistName}](${playlistUrl})` : playlistName;
+    row2 += `\nPlaylist: ${playlistLink}`;
+  }
+  if (row2) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(row2),
+    );
+  }
+
+  // ── Thumbnail + track details ─────────────────────────────────────────────────
+  const artist = track.author || 'Unknown Artist';
+  const totalDuration = formatDuration(track.length);
+  let durationLine;
+  if (player.paused && player.position > 0) {
+    const progress = formatDuration(player.position);
+    durationLine = `-# ${progress} / ${totalDuration}`;
+  } else {
+    durationLine = `-# ${totalDuration}`;
+  }
+
+  if (isWide) {
+    // Explicit YouTube: 16:9 gallery image
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+    // Large text title (no music emoji per item 17)
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`### ${track.title}`),
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`${artist}\n${durationLine}`),
+    );
+  } else {
+    // All other sources: 1:1 square thumbnail as section accessory
+    const trackText = `### ${track.title}\n${artist}\n${durationLine}`;
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(trackText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
     container.addSectionComponents(section);
-  } else {
-    // YouTube/other: 16:9 gallery image
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-    );
-
-    // ### ♪  Song Title
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### ${config.emojis.music}  ${track.title}`),
-    );
-
-    // Artist name
-    const artist = track.author || 'Unknown Artist';
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(artist),
-    );
-
-    // -# Duration (or Progress / Duration when paused)
-    const totalDuration = formatDuration(track.length);
-    let durationLine;
-    if (player.paused && player.position > 0) {
-      const progress = formatDuration(player.position);
-      durationLine = `-# ${progress} / ${totalDuration}`;
-    } else {
-      durationLine = `-# ${totalDuration}`;
-    }
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(durationLine),
-    );
   }
 
   container.addSeparatorComponents(new SeparatorBuilder());
@@ -789,9 +795,27 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
 }
 
 /**
+ * Build a progress bar string in the format ▬▬▬▬🔘▬▬▬▬
+ * The 🔘 position represents the current playback position.
+ * @param {number} position - Current position in ms
+ * @param {number} total - Total duration in ms
+ * @param {number} [bars=10] - Total number of bar segments
+ * @returns {string}
+ */
+function buildProgressBar(position, total, bars = 10) {
+  if (!total || total <= 0) return '▬'.repeat(bars);
+  const progress = Math.min(1, position / total);
+  const filled = Math.round(progress * bars);
+  const left = '▬'.repeat(Math.max(0, filled));
+  const right = '▬'.repeat(Math.max(0, bars - filled - 1));
+  return `${left}🔘${right}`;
+}
+
+/**
  * Build the Now Playing rich embed for the /nowplaying and !np commands.
  * Always uses a small thumbnail (no large art), never ComponentV2.
- * Includes Artists, Progress, Source, Requested By fields.
+ * Includes Artists, Progress bar, Source, Requested By fields.
+ * Author shows the requester's avatar and "Now Playing" text.
  * @param {object} track - KazagumoTrack
  * @param {object} player - KazagumoPlayer
  * @returns {{ embeds: EmbedBuilder[] }}
@@ -800,35 +824,37 @@ function buildNowPlayingEmbed(track, player) {
   const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
   const requester = track.requester;
-  const requesterMention = requester ? `<@${requester.id}>` : 'Unknown';
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
+  // Always use 1:1 square thumbnail for the nowplaying embed
   const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
-  // Always use a 1:1 thumbnail for the embed
-  const isYTM = (track.sourceName || '').toLowerCase() === 'youtubemusic';
-  const thumbUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+  const thumbUrl = getSquareThumbnailUrl(rawArtUrl);
 
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
   const position = player.position || 0;
   const total = track.length || 0;
+  const progressBar = buildProgressBar(position, total);
   const progressStr = `${formatDuration(position)} / ${formatDuration(total)}`;
 
   const accentColor = player.data?.get('accentColor');
 
+  // Author: requester avatar + "Now Playing" text
+  const authorIconUrl = requester?.displayAvatarURL?.({ size: 64 }) || null;
+
   const embed = new EmbedBuilder()
     .setColor(accentColor ?? config.embeds.color)
-    .setAuthor({ name: `${platformEmoji} Now Playing${loopMode}` })
+    .setAuthor({ name: `Now Playing${loopMode}`, iconURL: authorIconUrl || undefined })
     .setTitle(track.title)
     .setURL(track.uri || null)
     .setThumbnail(thumbUrl)
     .addFields(
       { name: '🎤 Artists', value: track.author || 'Unknown', inline: true },
       { name: '⏱️ Duration', value: formatDuration(total), inline: true },
-      { name: '📊 Progress', value: isPaused ? `⏸️ ${progressStr}` : `▶️ ${progressStr}`, inline: true },
       { name: `${platformEmoji} Source`, value: sourceDisplay, inline: true },
-      { name: '👤 Requested By', value: `${requesterName}`, inline: true },
+      { name: '📊 Progress', value: `${isPaused ? '⏸️' : '▶️'} ${progressBar}\n\`${progressStr}\``, inline: false },
+      { name: '👤 Requested By', value: requesterName, inline: true },
       { name: '📋 Queue', value: player.queue.length > 0 ? `${player.queue.length} track(s)` : 'Nothing', inline: true },
     )
     .setFooter({ text: config.embeds.footerText })
@@ -853,7 +879,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const isYTM = getThumbnailDisplayMode(track.sourceName) === 'square';
+  const isYTM = getThumbnailDisplayMode(track) === 'square';
   const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
   const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
@@ -981,7 +1007,7 @@ function buildAddedPlaylistV2(playlistName, trackCount, artUrl) {
 // ─── Queue Component v2 Builder ───────────────────────────────────────────────
 
 /** Number of tracks shown per queue page. */
-const QUEUE_PAGE_SIZE = 5;
+const QUEUE_PAGE_SIZE = 10;
 
 /**
  * Build the Queue Component v2 message payload with optional pagination and
@@ -1118,13 +1144,15 @@ const QUEUE_STANDALONE_PAGE_SIZE = 10;
 /**
  * Build the standalone Queue Component v2 message payload (10 per page).
  * Includes navigation buttons and a ❌ Delete button.
+ * Uses absolute queue numbers that don't reset until the queue is cleared.
  *
  * @param {object} current   - KazagumoTrack (now playing)
  * @param {object[]} tracks  - Upcoming tracks array
  * @param {number} page      - Current page (1-based)
+ * @param {number} [absoluteOffset=1] - Absolute index of the currently playing track
  * @returns {{ components: ContainerBuilder[], flags: number }}
  */
-function buildQueueStandaloneV2(current, tracks, page = 1) {
+function buildQueueStandaloneV2(current, tracks, page = 1, absoluteOffset = 1) {
   const totalPages = Math.max(1, Math.ceil(tracks.length / QUEUE_STANDALONE_PAGE_SIZE));
   const clampedPage = Math.min(Math.max(1, page), totalPages);
   const start = (clampedPage - 1) * QUEUE_STANDALONE_PAGE_SIZE;
@@ -1137,18 +1165,19 @@ function buildQueueStandaloneV2(current, tracks, page = 1) {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${config.emojis.queue} Music Queue — Page ${clampedPage}/${totalPages}\n` +
-        `**Now Playing:** ${currentEmoji} ${current.title} — \`${formatDuration(current.length)}\``,
+        `**Now Playing (#${absoluteOffset}):** ${currentEmoji} ${current.title} — \`${formatDuration(current.length)}\``,
     ),
   );
 
   container.addSeparatorComponents(new SeparatorBuilder());
 
-  // Track list
+  // Track list — numbers continue from where the current track's absolute index is
   const trackListText = pageTracks.length
     ? pageTracks
         .map((t, i) => {
           const emoji = resolvePlatformEmoji(t.sourceName);
-          return `**${start + i + 1}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
+          const absNum = absoluteOffset + start + i + 1;
+          return `**${absNum}.** ${emoji} ${t.title} — \`${formatDuration(t.length)}\``;
         })
         .join('\n')
     : '*No upcoming tracks.*';
@@ -1224,6 +1253,7 @@ module.exports = {
   buildQueueStandaloneV2,
   buildPlayNextConfirmV2,
   buildConfirmV2,
+  buildProgressBar,
   QUEUE_PAGE_SIZE,
   QUEUE_STANDALONE_PAGE_SIZE,
   SETUP_QUEUE_PAGE_SIZE,
