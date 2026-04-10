@@ -16,45 +16,28 @@ module.exports = {
 
     const voiceChannel = message.member.voice.channel;
 
-    let player = client.manager.players.get(message.guild.id);
-
-    // If a player exists but bot was manually kicked from VC, destroy the stale player
-    const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
-    if (player && !botVoiceChannelId) {
-      await player.destroy().catch(() => {});
-      player = null;
-    }
-
-    if (player && player.voiceId === voiceChannel.id) {
-      return message.reply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
-    }
-
-    if (player && player.voiceId !== voiceChannel.id) {
-      // Bot is in a different VC — move it to the user's VC
-      try {
-        await message.guild.members.me.voice.setChannel(voiceChannel);
-        player.voiceId = voiceChannel.id;
-      } catch {
-        // If move fails, destroy and recreate
-        await player.destroy().catch(() => {});
-        player = null;
+    // Always destroy any existing player so we get a clean connection
+    const existingPlayer = client.manager.players.get(message.guild.id);
+    if (existingPlayer) {
+      const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
+      if (botVoiceChannelId && botVoiceChannelId === voiceChannel.id) {
+        return message.reply({ embeds: [buildErrorEmbed(`I'm already in **${voiceChannel.name}**!`)] });
       }
+      existingPlayer.data.set('intentionalDisconnect', true);
+      await existingPlayer.destroy().catch(() => {});
     }
 
-    if (!player) {
-      player = await client.manager.createPlayer({
-        guildId: message.guild.id,
-        voiceId: voiceChannel.id,
-        textId: message.channel.id,
-        deaf: true,
-        shardId: message.guild.shardId ?? 0,
-      });
-      player.data.set('textChannel', message.channel.id);
-    }
+    const player = await client.manager.createPlayer({
+      guildId: message.guild.id,
+      voiceId: voiceChannel.id,
+      textId: message.channel.id,
+      deaf: true,
+      shardId: message.guild.shardId ?? 0,
+    });
+    player.data.set('textChannel', message.channel.id);
 
     const payload = buildConfirmV2(`✅ Joined **${voiceChannel.name}**!`, 0x57f287);
     const reply = await message.reply(payload);
-    const timer = setTimeout(() => reply.delete().catch(() => {}), 10000);
-    reply.once('delete', () => clearTimeout(timer));
+    setTimeout(() => reply.delete().catch(() => {}), 10000);
   },
 };

@@ -35,6 +35,12 @@ module.exports = {
 
       const player = client.manager.players.get(guildId);
       if (player) {
+        // Skip destroying if the disconnect was triggered intentionally (by a command)
+        if (player.data.get('intentionalDisconnect')) {
+          console.log(`[VoiceStateUpdate] Intentional disconnect detected — skipping double-destroy.`);
+          player.data.delete('intentionalDisconnect');
+          return;
+        }
         try {
           await player.destroy();
           console.log(`[VoiceStateUpdate] Player destroyed for guild "${guildId}".`);

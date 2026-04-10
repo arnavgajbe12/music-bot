@@ -24,6 +24,7 @@ module.exports = {
     const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
     // Clear queue and destroy player
+    player.data.set('intentionalDisconnect', true);
     player.queue.clear();
     try {
       await player.destroy();

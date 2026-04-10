@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildErrorEmbed } = require('../../../utils/embeds');
+const { buildErrorEmbed, formatDuration } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
 const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
@@ -13,7 +13,11 @@ module.exports = {
     .setName('play')
     .setDescription('Play a song or add it to the queue.')
     .addStringOption((option) =>
-      option.setName('query').setDescription('Song name, URL, or Spotify link').setRequired(true),
+      option
+        .setName('query')
+        .setDescription('Song name, URL, or Spotify link')
+        .setRequired(true)
+        .setAutocomplete(true),
     )
     .addStringOption((option) =>
       option
@@ -31,8 +35,32 @@ module.exports = {
         ),
     ),
 
+  async autocomplete(client, interaction) {
+    const focusedValue = interaction.options.getFocused();
+    if (!focusedValue || focusedValue.trim().length < 2) {
+      return interaction.respond([]).catch(() => {});
+    }
+    try {
+      const query = `ytmsearch:${focusedValue.trim()}`;
+      const result = await client.manager.search(query, { requester: interaction.user, source: '' });
+      if (!result || !result.tracks.length) return interaction.respond([]).catch(() => {});
+      const choices = result.tracks.slice(0, 10).map((t) => {
+        const duration = formatDuration(t.length);
+        const title = t.title || 'Unknown';
+        const artist = t.author || 'Unknown';
+        const labelRaw = `${title} - ${artist} - ${duration}`;
+        const label = labelRaw.length > 100 ? labelRaw.slice(0, 97) + '...' : labelRaw;
+        const value = (t.uri || `${title} ${artist}`).slice(0, 100);
+        return { name: label, value };
+      });
+      return interaction.respond(choices).catch(() => {});
+    } catch {
+      return interaction.respond([]).catch(() => {});
+    }
+  },
+
   async run(client, interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ephemeral: false });
 
     const voiceCheck = checkVoice(interaction.member, interaction.guild);
     if (!voiceCheck.ok) {
@@ -152,7 +180,7 @@ module.exports = {
         const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         await interaction.editReply(payload);
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
         return;
       }
       await interaction.deleteReply().catch(() => {});
@@ -160,14 +188,14 @@ module.exports = {
       const track = result.tracks[0];
       player.queue.add(track);
       if (!wasIdle) {
-        // Song added to an already-running queue – show "Added to Queue" Component v2
+        // Song added to an already-running queue – show "Added to Queue" Component v2 (non-ephemeral)
         const queueSize = player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         await interaction.editReply(payload);
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
         return;
       }
-      // Starting fresh – the playerStart event will send the Now Playing panel
+      // Starting fresh – delete the deferred reply and let playerStart handle the Now Playing panel
       await interaction.deleteReply().catch(() => {});
     }
 

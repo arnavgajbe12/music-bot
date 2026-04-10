@@ -35,6 +35,18 @@ async function resolveAccentColor(player, artUrl) {
  */
 module.exports = (client) => {
   client.on('interactionCreate', async (interaction) => {
+    // ── Autocomplete ───────────────────────────────────────────────────────
+    if (interaction.isAutocomplete()) {
+      const command = client.slashCommands.get(interaction.commandName);
+      if (!command?.autocomplete) return;
+      try {
+        await command.autocomplete(client, interaction);
+      } catch (error) {
+        console.error(`[InteractionHandler] Autocomplete error in "${interaction.commandName}":`, error);
+      }
+      return;
+    }
+
     // ── Slash Commands ─────────────────────────────────────────────────────
     if (interaction.isChatInputCommand()) {
       const command = client.slashCommands.get(interaction.commandName);
@@ -245,7 +257,8 @@ module.exports = (client) => {
           case 'view_queue': {
             await interaction.deferUpdate();
             const tracks = [...player.queue];
-            const queuePayload = buildQueueV2(player.queue.current, tracks, 1);
+            const absoluteOffset = player.data?.get('absoluteQueueIndex') ?? 1;
+            const queuePayload = buildQueueStandaloneV2(player.queue.current, tracks, 1, absoluteOffset);
             await interaction.followUp({ ...queuePayload, ephemeral: true });
             break;
           }
@@ -512,7 +525,8 @@ module.exports = (client) => {
         }
         const page = parseInt(customId.split(':')[1], 10);
         const tracks = [...player.queue];
-        const payload = buildQueueStandaloneV2(player.queue.current, tracks, page);
+        const absoluteOffset = player.data?.get('absoluteQueueIndex') ?? 1;
+        const payload = buildQueueStandaloneV2(player.queue.current, tracks, page, absoluteOffset);
         return interaction.update(payload);
       }
 
