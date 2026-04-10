@@ -32,6 +32,7 @@ module.exports = {
     const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
       console.log(`[prefix play] Stale player detected in guild "${message.guild.id}" — destroying before rejoin.`);
+      player.data.set('intentionalDisconnect', true);
       await player.destroy().catch(() => {});
       player = null;
     }
@@ -48,18 +49,10 @@ module.exports = {
     } else {
       // Always update the text channel to where !play was just used (item 3)
       player.data.set('textChannel', message.channel.id);
-      // Delete the old now-playing message so the new one appears in this channel
-      const oldMsgId = player.data.get('nowPlayingMessageId');
-      const oldChannelId = player.data.get('nowPlayingMessageChannelId');
-      if (oldMsgId && oldChannelId) {
-        const oldChannel = client.channels.cache.get(oldChannelId);
-        if (oldChannel?.isTextBased()) {
-          oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
-        }
-        player.data.delete('nowPlayingMessage');
-        player.data.delete('nowPlayingMessageId');
-        player.data.delete('nowPlayingMessageChannelId');
-      }
+      // Clear old now-playing message reference so a new one is sent in this channel
+      player.data.delete('nowPlayingMessage');
+      player.data.delete('nowPlayingMessageId');
+      player.data.delete('nowPlayingMessageChannelId');
     }
 
     // Use per-guild playback source if set, otherwise use the ytmsearch → ytsearch → scsearch fallback

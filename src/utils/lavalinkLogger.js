@@ -65,7 +65,7 @@ async function logToLavalinkChannel(client, { title, description, color, fields 
  * @param {object} track - KazagumoTrack
  */
 async function logTrackStart(client, player, track) {
-  const artUrl = track.thumbnail || track.artworkUrl || null;
+  const artUrl = track.artworkUrl || track.thumbnail || null;
   return logToLavalinkChannel(client, {
     title: '▶️ Track Started',
     color: 0x57f287,

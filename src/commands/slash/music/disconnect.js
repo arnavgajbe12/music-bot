@@ -23,23 +23,13 @@ module.exports = {
 
     const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
 
-    // Clear queue and destroy player
+    // Clear queue and destroy player (Kazagumo destroy also handles VC leave via Shoukaku)
     player.data.set('intentionalDisconnect', true);
     player.queue.clear();
     try {
       await player.destroy();
     } catch {
-      // Ignore
-    }
-
-    // Force the bot to leave the VC via the voice adapter if still connected
-    try {
-      const botVoice = interaction.guild.members.me?.voice;
-      if (botVoice?.channel) {
-        await botVoice.disconnect();
-      }
-    } catch {
-      // Non-fatal
+      // Ignore errors from destroy – Shoukaku handles the actual disconnect
     }
 
     const payload = buildConfirmV2(`👋 Left **${channelName}** and cleared the queue.`, 0xed4245);

@@ -33,8 +33,8 @@ module.exports = {
     // Log track start to the Lavalink channel (not the error webhook)
     logTrackStart(client, player, track).catch(() => {});
 
-    // Extract dominant color once, reuse for all panels
-    const artUrl = track.thumbnail || track.artworkUrl || null;
+    // Extract dominant color once, reuse for all panels; prefer artworkUrl (1:1 album art)
+    const artUrl = track.artworkUrl || track.thumbnail || null;
     const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
     player.data.set('accentColor', accentColor);
     player.data.set('setupQueueView', false);
@@ -91,30 +91,13 @@ module.exports = {
       const payload = buildNowPlayingV2(track, player, settings.largeArt);
 
       try {
-        const existingMsgId = player.data.get('nowPlayingMessageId');
-        let nowPlayingMsg = null;
-
-        if (existingMsgId) {
-          try {
-            const fetched = await channel.messages.fetch(existingMsgId);
-            if (fetched?.editable) {
-              await fetched.edit(payload);
-              nowPlayingMsg = fetched;
-            }
-          } catch {
-            // Message gone – send a new one
-          }
-        }
-
-        if (!nowPlayingMsg) {
-          nowPlayingMsg = await channel.send(payload);
-          player.data.set('nowPlayingMessageId', nowPlayingMsg.id);
-          player.data.set('nowPlayingMessageChannelId', channel.id);
-        }
-
+        // Always send a new now-playing message for each new track
+        const nowPlayingMsg = await channel.send(payload);
+        player.data.set('nowPlayingMessageId', nowPlayingMsg.id);
+        player.data.set('nowPlayingMessageChannelId', channel.id);
         player.data.set('nowPlayingMessage', nowPlayingMsg);
       } catch (error) {
-        console.error('[playerStart] Error updating now-playing message:', error);
+        console.error('[playerStart] Error sending now-playing message:', error);
       }
     }
 
