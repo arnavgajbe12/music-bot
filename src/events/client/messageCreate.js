@@ -123,6 +123,8 @@ module.exports = {
 
     // ── Prefix Command Handler ─────────────────────────────────────────────
     // Determine which prefix(es) are active for this guild
+    // getPrefixes returns [config.botSetup.prefix] if no custom prefix is set,
+    // so the default '!' still works unless a guild has set a custom prefix via /prefix set
     const guildPrefixes = getPrefixes(message.guild.id);
 
     // Find which prefix (if any) was used
@@ -132,11 +134,6 @@ module.exports = {
         usedPrefix = p;
         break;
       }
-    }
-
-    // Also allow the config default prefix as a fallback
-    if (!usedPrefix && message.content.startsWith(config.botSetup.prefix)) {
-      usedPrefix = config.botSetup.prefix;
     }
 
     // No-prefix check: if the user has no-prefix access, treat entire message as a command

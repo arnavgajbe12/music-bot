@@ -226,7 +226,7 @@ module.exports = (client) => {
             const track = player.queue.current;
             const platformEmoji = resolvePlatformEmoji(track.sourceName);
             const sourceDisplay = resolveSourceDisplayName(track.sourceName);
-            const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+            const artUrl = track.artworkUrl || track.thumbnail || config.images.defaultThumbnail;
             const requester = track.requester;
             const requesterName = requester
               ? requester.displayName || requester.username || requester.tag || 'Unknown'

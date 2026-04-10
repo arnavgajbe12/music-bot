@@ -76,6 +76,7 @@ module.exports = {
     const botVoiceChannelId = interaction.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
       console.log(`[slash play] Stale player detected in guild "${interaction.guild.id}" — destroying before rejoin.`);
+      player.data.set('intentionalDisconnect', true);
       await player.destroy().catch(() => {});
       player = null;
     }
@@ -91,22 +92,11 @@ module.exports = {
       player.data.set('textChannel', interaction.channel.id);
     } else {
       // Update text channel if the user is issuing the command from a different channel
-      const prevChannelId = player.data.get('textChannel');
-      if (prevChannelId && prevChannelId !== interaction.channel.id) {
-        player.data.set('textChannel', interaction.channel.id);
-        // Delete the old now-playing message so the new one appears in this channel
-        const oldMsgId = player.data.get('nowPlayingMessageId');
-        const oldChannelId = player.data.get('nowPlayingMessageChannelId');
-        if (oldMsgId && oldChannelId) {
-          const oldChannel = client.channels.cache.get(oldChannelId);
-          if (oldChannel?.isTextBased()) {
-            oldChannel.messages.fetch(oldMsgId).then((m) => m.delete().catch(() => {})).catch(() => {});
-          }
-          player.data.delete('nowPlayingMessage');
-          player.data.delete('nowPlayingMessageId');
-          player.data.delete('nowPlayingMessageChannelId');
-        }
-      }
+      player.data.set('textChannel', interaction.channel.id);
+      // Clear old now-playing message reference so a new one is sent
+      player.data.delete('nowPlayingMessage');
+      player.data.delete('nowPlayingMessageId');
+      player.data.delete('nowPlayingMessageChannelId');
     }
 
     // Use source option (if provided) → per-guild source → fallback chain

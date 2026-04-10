@@ -28,7 +28,7 @@ module.exports = {
     const settings = getSettings(interaction.guild.id);
 
     if (track) {
-      const artUrl = track.thumbnail || track.artworkUrl || null;
+      const artUrl = track.artworkUrl || track.thumbnail || null;
       const accentColor = await extractDominantColor(artUrl).catch(() => Math.floor(Math.random() * 0xffffff));
       player.data.set('accentColor', accentColor);
       payload = buildNowPlayingV2(track, player, settings.largeArt);

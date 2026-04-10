@@ -97,7 +97,7 @@ function resolveSourceDisplayName(sourceName) {
  * @returns {EmbedBuilder}
  */
 function buildNowPlayingEmbed(track, player, platformEmoji) {
-  const thumbnail = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const thumbnail = track.artworkUrl || track.thumbnail || config.images.defaultThumbnail;
   const requester = track.requester;
   const requesterTag = requester ? `<@${requester.id}>` : 'Unknown';
   const emoji = platformEmoji || config.emojis.music;

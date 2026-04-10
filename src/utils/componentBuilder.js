@@ -187,14 +187,17 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const isYTM = getThumbnailDisplayMode(track) === 'square';
-  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
-  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+  const isWide = getThumbnailDisplayMode(track) === 'wide';
+  // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video) for non-yt tracks
+  const rawArtUrl = isWide
+    ? (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail)
+    : (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail);
+  const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';
 
-  // Item 3: top header includes title hyperlink — "<emoji> **Now Playing** - [Title](url)"
+  // Top header: "<emoji> Now Playing - [Title](url)"
   const titleLink = track.uri ? `[${track.title}](${track.uri})` : track.title;
   const statusText = isPaused
     ? `${platformEmoji} **Paused** - ${titleLink}${loopMode}`
@@ -211,7 +214,7 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     new TextDisplayBuilder().setContent(statusText),
   );
 
-  // Detail text without title (title is in the header line)
+  // Detail text (artist, source, duration, requester — title shown separately below image)
   const detailText =
     `🎤  ${track.author || 'Unknown'}\n` +
     `${platformEmoji}: ${sourceDisplay}\n` +
@@ -219,21 +222,17 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     `👤  ${requesterName}`;
 
   if (largeArt) {
-    if (isYTM) {
-      // YouTube Music: 1:1 square thumbnail as section accessory
-      const section = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-      container.addSectionComponents(section);
-    } else {
-      // YouTube/other: 16:9 gallery image
-      container.addMediaGalleryComponents(
-        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-      );
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
-    }
+    // Large gallery image for all track types (as required)
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+    // Large song title (## heading) below the image, no link
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${track.title}`),
+    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
   } else {
-    // Small thumbnail in a section accessory (always 1:1 in this mode)
+    // Small thumbnail in a section accessory
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
       .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
@@ -498,7 +497,10 @@ function getSquareThumbnailUrl(url) {
  */
 function buildSetupNowPlayingV2(track, player, accentColor) {
   const isWide = getThumbnailDisplayMode(track) === 'wide';
-  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  // For wide (yt) tracks prefer thumbnail (16:9); for all others prefer artworkUrl (1:1)
+  const rawArtUrl = isWide
+    ? (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail)
+    : (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail);
   const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const container = new ContainerBuilder();
@@ -544,26 +546,17 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
     durationLine = `-# ${totalDuration}`;
   }
 
-  if (isWide) {
-    // Explicit YouTube: 16:9 gallery image
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-    );
-    // Large text title (no music emoji per item 17)
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### ${track.title}`),
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`${artist}\n${durationLine}`),
-    );
-  } else {
-    // All other sources: 1:1 square thumbnail as section accessory
-    const trackText = `### ${track.title}\n${artist}\n${durationLine}`;
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(trackText))
-      .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-    container.addSectionComponents(section);
-  }
+  // Large gallery image for all track types (as required — large image everywhere)
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+  );
+  // Large text title (## heading) below the image
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${track.title}`),
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`${artist}\n${durationLine}`),
+  );
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupButtonsV2(player));
@@ -827,8 +820,8 @@ function buildNowPlayingEmbed(track, player) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  // Always use 1:1 square thumbnail for the nowplaying embed
-  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  // Always use 1:1 square thumbnail for the nowplaying embed; prefer artworkUrl (1:1 album art)
+  const rawArtUrl = track.artworkUrl || track.thumbnail || config.images.defaultThumbnail;
   const thumbUrl = getSquareThumbnailUrl(rawArtUrl);
 
   const isPaused = player.paused;
@@ -880,7 +873,10 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
   const isYTM = getThumbnailDisplayMode(track) === 'square';
-  const rawArtUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video) for non-yt tracks
+  const rawArtUrl = isYTM
+    ? (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail)
+    : (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail);
   const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
   const isPaused = player.paused;
@@ -948,7 +944,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
 function buildAddedToQueueV2(track, queueSize) {
   const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
-  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const artUrl = track.artworkUrl || track.thumbnail || config.images.defaultThumbnail;
 
   const container = new ContainerBuilder();
 
@@ -1110,7 +1106,7 @@ function buildQueueV2(current, tracks, page = 1) {
 function buildPlayNextConfirmV2(track) {
   const platformEmoji = resolvePlatformEmoji(track.sourceName);
   const sourceDisplay = resolveSourceDisplayName(track.sourceName);
-  const artUrl = track.thumbnail || track.artworkUrl || config.images.defaultThumbnail;
+  const artUrl = track.artworkUrl || track.thumbnail || config.images.defaultThumbnail;
 
   const container = new ContainerBuilder();
 
@@ -1118,7 +1114,7 @@ function buildPlayNextConfirmV2(track) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${config.emojis.skip} Play Next\n` +
-          `### ${track.title}\n` +
+          `## ${track.title}\n` +
           `🎤  ${track.author || 'Unknown'}\n` +
           `${platformEmoji}: ${sourceDisplay}\n` +
           `⏱️  ${formatDuration(track.length)}\n` +
