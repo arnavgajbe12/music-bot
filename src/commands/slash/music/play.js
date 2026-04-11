@@ -167,7 +167,9 @@ module.exports = {
     if (result.type === 'PLAYLIST') {
       for (const track of result.tracks) player.queue.add(track);
       if (!wasIdle) {
-        const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
+        const artUrl = result.tracks[0]?.useWide
+          ? (result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl)
+          : (result.tracks[0]?.artworkUrl || result.tracks[0]?.thumbnail);
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
