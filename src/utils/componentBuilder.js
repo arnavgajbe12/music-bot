@@ -172,7 +172,12 @@ function getThumbnailDisplayMode(track) {
   if (track?.useWide === true) return 'wide';
   if (track?.sourceName === 'youtubemusic') {
     const artUrl = track.artworkUrl || track.thumbnail || '';
-    if (artUrl.includes('i.ytimg.com')) return 'wide';
+    try {
+      const { hostname } = new URL(artUrl);
+      if (hostname === 'i.ytimg.com') return 'wide';
+    } catch {
+      // Not a valid URL — treat as square
+    }
     return 'square';
   }
   return 'square';
