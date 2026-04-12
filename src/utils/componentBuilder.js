@@ -169,8 +169,13 @@ function buildMoreOptionsDropdown() {
  * @returns {'square'|'wide'}
  */
 function getThumbnailDisplayMode(track) {
-  // Only use wide (16:9) if the track was explicitly searched via !yt or /yt
-  return track?.useWide === true ? 'wide' : 'square';
+  if (track?.useWide === true) return 'wide';
+  if (track?.sourceName === 'youtubemusic') {
+    const artUrl = track.artworkUrl || track.thumbnail || '';
+    if (artUrl.includes('i.ytimg.com')) return 'wide';
+    return 'square';
+  }
+  return 'square';
 }
 
 /**
@@ -883,12 +888,12 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const requesterName = requester
     ? requester.displayName || requester.username || requester.tag || 'Unknown'
     : 'Unknown';
-  const isYTM = getThumbnailDisplayMode(track) === 'square';
+  const isSquare = getThumbnailDisplayMode(track) === 'square';
   // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video) for non-yt tracks
-  const rawArtUrl = isYTM
+  const rawArtUrl = isSquare
     ? (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail)
     : (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail);
-  const artUrl = isYTM ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
+  const artUrl = isSquare ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
   const isPaused = player.paused;
   const loopMode = player.loop && player.loop !== 'none' ? ` ${config.emojis.loop} \`${player.loop}\`` : '';

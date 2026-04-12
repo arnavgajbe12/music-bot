@@ -71,6 +71,9 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
             player.data.delete('nowPlayingMessageId');
             player.data.delete('nowPlayingMessageChannelId');
           }
+          // Also move the control panel to the new channel
+          player.data.delete('controlMessageId');
+          player.data.delete('controlMessageChannelId');
         }
       }
 
@@ -167,6 +170,16 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
       const searchMsg = await message.channel.send({ content: `🔍 Searching for \`${rawQuery}\` on ${platformLabel}...` });
 
       let player = client.manager.players.get(message.guild.id);
+      const botVcId = message.guild.members.me?.voice?.channelId;
+
+      if (player && !botVcId) {
+        try { await player.shoukaku?.node?.destroyPlayer(message.guild.id); } catch {}
+        try { await client.manager.shoukaku?.leaveVoiceChannel(message.guild.id); } catch {}
+        try { await player.destroy(); } catch {}
+        client.manager.players.delete(message.guild.id);
+        player = null;
+      }
+
       if (!player) {
         player = await client.manager.createPlayer({
           guildId: message.guild.id,
@@ -191,6 +204,9 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
             player.data.delete('nowPlayingMessageId');
             player.data.delete('nowPlayingMessageChannelId');
           }
+          // Also move the control panel to the new channel
+          player.data.delete('controlMessageId');
+          player.data.delete('controlMessageChannelId');
         }
       }
 
