@@ -386,7 +386,10 @@ module.exports = (client) => {
           const channelName = interaction.guild.channels.cache.get(player.voiceId)?.name || 'voice channel';
           player.data.set('intentionalDisconnect', true);
           player.queue.clear();
+          try { await player.shoukaku?.node?.destroyPlayer(interaction.guild.id); } catch { /* ignore */ }
+          try { await client.manager.shoukaku?.leaveVoiceChannel(interaction.guild.id); } catch { /* ignore */ }
           try { await player.destroy(); } catch { /* ignore */ }
+          client.manager.players.delete(interaction.guild.id);
           try {
             const botVoice = interaction.guild.members.me?.voice;
             if (botVoice?.channel) await botVoice.disconnect();

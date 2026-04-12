@@ -61,6 +61,7 @@ module.exports = {
             // Non-fatal – continue with Kazagumo destroy regardless
           }
           await player.destroy();
+          client.manager.players.delete(guildId);
           console.log(`[VoiceStateUpdate] Player destroyed for guild "${guildId}".`);
         } catch (err) {
           console.error(`[VoiceStateUpdate] Error destroying player for guild "${guildId}":`, err);

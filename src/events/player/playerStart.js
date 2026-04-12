@@ -1,6 +1,7 @@
 const { buildNowPlayingV2, buildSetupNowPlayingV2, extractDominantColor } = require('../../utils/componentBuilder');
 const { getSetup, getSettings } = require('../../utils/setupManager');
 const { logTrackStart } = require('../../utils/lavalinkLogger');
+const { updateNowPlayingMessage } = require('../../utils/panelUpdater');
 
 module.exports = {
   /**
@@ -84,21 +85,8 @@ module.exports = {
       const channelId = player.data.get('textChannel');
       if (!channelId) return;
 
-      const channel = client.channels.cache.get(channelId);
-      if (!channel?.isTextBased()) return;
-
-      // Build standard now-playing payload
       const payload = buildNowPlayingV2(track, player, settings.largeArt);
-
-      try {
-        // Always send a new now-playing message for each new track
-        const nowPlayingMsg = await channel.send(payload);
-        player.data.set('nowPlayingMessageId', nowPlayingMsg.id);
-        player.data.set('nowPlayingMessageChannelId', channel.id);
-        player.data.set('nowPlayingMessage', nowPlayingMsg);
-      } catch (error) {
-        console.error('[playerStart] Error sending now-playing message:', error);
-      }
+      await updateNowPlayingMessage(client, player, payload, channelId);
     }
 
     // ── Auto-update Voice Channel Status ─────────────────────────────────────

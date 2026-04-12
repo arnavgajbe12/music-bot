@@ -36,6 +36,16 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
       const voiceChannel = interaction.member.voice.channel;
 
       let player = client.manager.players.get(interaction.guild.id);
+      const botVcId = interaction.guild.members.me?.voice?.channelId;
+
+      if (player && !botVcId) {
+        try { await player.shoukaku?.node?.destroyPlayer(interaction.guild.id); } catch {}
+        try { await client.manager.shoukaku?.leaveVoiceChannel(interaction.guild.id); } catch {}
+        try { await player.destroy(); } catch {}
+        client.manager.players.delete(interaction.guild.id);
+        player = null;
+      }
+
       if (!player) {
         player = await client.manager.createPlayer({
           guildId: interaction.guild.id,

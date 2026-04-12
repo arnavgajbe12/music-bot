@@ -2,6 +2,7 @@ const config = require('../../../config');
 const { buildErrorEmbed } = require('../../utils/embeds');
 const { getSetup, getSettings, hasNoPrefix, getPrefixes } = require('../../utils/setupManager');
 const { logToWebhook } = require('../../utils/webhookLogger');
+const { incrementBuryCount } = require('../../utils/panelUpdater');
 
 // Map short platform prefixes to Kazagumo/LavaSrc search prefixes
 const PLATFORM_PREFIXES = {
@@ -53,10 +54,13 @@ module.exports = {
 
       let player = client.manager.players.get(message.guild.id);
 
-      // If a player exists but bot was manually disconnected from VC, destroy and recreate
+      // If a player exists but bot was manually disconnected from VC, nuke it fully so we can rejoin
       const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
       if (player && !botVoiceChannelId) {
-        await player.destroy().catch(() => {});
+        try { await player.shoukaku?.node?.destroyPlayer(message.guild.id); } catch {}
+        try { await client.manager.shoukaku?.leaveVoiceChannel(message.guild.id); } catch {}
+        try { await player.destroy(); } catch {}
+        client.manager.players.delete(message.guild.id);
         player = null;
       }
 
@@ -122,6 +126,12 @@ module.exports = {
     }
 
     // ── Prefix Command Handler ─────────────────────────────────────────────
+    // Increment bury count for non-bot messages (sticky NP message logic)
+    const playerForBury = client.manager?.players?.get(message.guild.id);
+    if (playerForBury) {
+      incrementBuryCount(playerForBury, message.channelId);
+    }
+
     // Determine which prefix(es) are active for this guild
     // getPrefixes returns [config.botSetup.prefix] if no custom prefix is set,
     // so the default '!' still works unless a guild has set a custom prefix via /prefix set
