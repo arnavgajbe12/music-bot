@@ -147,6 +147,9 @@ async function refreshControlPanel(client, channel, player, settings) {
   // Send a fresh control panel
   try {
     const msg = await channel.send(payload);
+    // Track both as control panel AND as the now-playing message so that:
+    // - playerStart can update it when the next track starts (uses controlMessageId)
+    // - updateNowPlayingMessage / panelUpdater bury-count logic can find & edit it (uses nowPlayingMessageId)
     player.data.set('controlMessageId', msg.id);
     player.data.set('controlMessageChannelId', channel.id);
     player.data.set('nowPlayingMessage', msg);
