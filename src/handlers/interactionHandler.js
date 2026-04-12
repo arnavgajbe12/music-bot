@@ -197,7 +197,9 @@ module.exports = (client) => {
               const isControlMsg = controlMsgId && interaction.message?.id === controlMsgId;
               let payload;
               if (isSetupMsg) {
-                const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+                const artUrl = player.queue.current?.useWide
+                  ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+                  : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
                 const accentColor = await resolveAccentColor(player, artUrl);
                 payload = buildSetupNowPlayingV2(player.queue.current, player, accentColor);
               } else if (isControlMsg) {
@@ -422,7 +424,9 @@ module.exports = (client) => {
           player.queue.clear();
           await interaction.deferUpdate();
           // Refresh queue view
-          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const artUrl = player.queue.current?.useWide
+            ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+            : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
           const accentColor = await resolveAccentColor(player, artUrl);
           const tracks = [...player.queue];
           const recommendations = player.data.get('setupRecommendations') || [];
@@ -441,7 +445,9 @@ module.exports = (client) => {
           player.queue.splice(0, player.queue.length, ...queueArr);
           await interaction.deferUpdate();
           // Refresh queue view
-          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const artUrl = player.queue.current?.useWide
+            ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+            : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
           const accentColor = await resolveAccentColor(player, artUrl);
           const tracks = [...player.queue];
           const recommendations = player.data.get('setupRecommendations') || [];
@@ -504,7 +510,9 @@ module.exports = (client) => {
             if (setupChannel?.isTextBased()) {
               const setupMsg = await setupChannel.messages.fetch(setupInfo.messageId).catch(() => null);
               if (setupMsg?.editable && player.data.get('setupQueueView')) {
-                const artUrl = player.queue.current?.thumbnail || player.queue.current?.artworkUrl || null;
+                const artUrl = player.queue.current?.useWide
+                  ? (player.queue.current?.thumbnail || player.queue.current?.artworkUrl || null)
+                  : (player.queue.current?.artworkUrl || player.queue.current?.thumbnail || null);
                 const accentColor = await resolveAccentColor(player, artUrl);
                 const tracks = [...player.queue];
                 const recommendations = player.data.get('setupRecommendations') || [];
@@ -574,7 +582,9 @@ module.exports = (client) => {
 
         const page = parseInt(customId.split(':')[1], 10);
         const tracks = [...player.queue];
-        const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+        const artUrl = player.queue.current?.useWide
+          ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+          : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
         const accentColor = await resolveAccentColor(player, artUrl);
         const payload = buildSetupQueueViewV2(player.queue.current, tracks, page, accentColor, player);
         player.data.set('setupQueuePage', page);
@@ -612,7 +622,9 @@ module.exports = (client) => {
           // Toggle queue view
           const isQueueView = player.data.get('setupQueueView') === true;
           if (!player.queue.current) return interaction.deferUpdate().catch(() => {});
-          const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+          const artUrl = player.queue.current?.useWide
+            ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+            : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
           const accentColor = await resolveAccentColor(player, artUrl);
           if (isQueueView) {
             // Switch back to art view
@@ -784,7 +796,9 @@ module.exports = (client) => {
 
           if (isSetupMsg) {
             // Setup channel — respect current view mode
-            const artUrl = player.queue.current.thumbnail || player.queue.current.artworkUrl || null;
+            const artUrl = player.queue.current?.useWide
+              ? (player.queue.current.thumbnail || player.queue.current.artworkUrl || null)
+              : (player.queue.current.artworkUrl || player.queue.current.thumbnail || null);
             const accentColor = await resolveAccentColor(player, artUrl);
             const isQueueView = player.data.get('setupQueueView') === true;
             if (isQueueView) {
