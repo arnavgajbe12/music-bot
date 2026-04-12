@@ -11,16 +11,16 @@ module.exports = {
 
   async run(client, message, args) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return message.reply({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
     }
 
     if (!args.length) {
-      return message.reply({ embeds: [buildErrorEmbed('Usage: `!setup #channel` or `!setup remove`')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Usage: `!setup #channel` or `!setup remove`')] });
     }
 
     if (args[0].toLowerCase() === 'remove') {
       removeSetup(message.guild.id);
-      return message.reply({ embeds: [buildEmbed('🗑️ Song Request channel has been removed.')] });
+      return message.channel.send({ embeds: [buildEmbed('🗑️ Song Request channel has been removed.')] });
     }
 
     // Accept a channel mention (<#id>) or a bare channel ID
@@ -28,7 +28,7 @@ module.exports = {
     const channel = message.guild.channels.cache.get(channelId);
 
     if (!channel?.isTextBased()) {
-      return message.reply({
+      return message.channel.send({
         embeds: [buildErrorEmbed('Please mention a valid text channel, e.g. `!setup #music`')],
       });
     }
@@ -39,14 +39,14 @@ module.exports = {
     try {
       panelMsg = await channel.send(payload);
     } catch {
-      return message.reply({
+      return message.channel.send({
         embeds: [buildErrorEmbed(`Failed to send the panel to ${channel}. Make sure I have permission to send messages there.`)],
       });
     }
 
     saveSetup(message.guild.id, channel.id, panelMsg.id);
 
-    return message.reply({
+    return message.channel.send({
       embeds: [
         buildEmbed(
           `✅ Song Request channel set to ${channel}.\n\nUsers can now type a song name (or use \`yt\`, \`sp\`, \`ap\`, etc. as a prefix) directly in that channel to request songs!`,

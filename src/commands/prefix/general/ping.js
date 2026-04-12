@@ -8,7 +8,7 @@ module.exports = {
   usage: '',
 
   async run(client, message) {
-    const sent = await message.reply({ content: '🏓 Pinging...' });
+    const sent = await message.channel.send({ content: '🏓 Pinging...' });
     const ping = sent.createdTimestamp - message.createdTimestamp;
     const wsLatency = client.ws.ping;
 

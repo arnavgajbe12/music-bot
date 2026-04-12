@@ -170,7 +170,7 @@ module.exports = {
       await command.run(client, message, args);
     } catch (error) {
       console.error(`[MessageCreate] Error in prefix command "${commandName}":`, error);
-      await message.reply({ embeds: [buildErrorEmbed('An error occurred while running that command.')] }).catch(() => {});
+      await message.channel.send({ embeds: [buildErrorEmbed('An error occurred while running that command.')] }).catch(() => {});
     }
   },
 };

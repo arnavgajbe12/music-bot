@@ -4,6 +4,7 @@ const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/co
 const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
+const { refreshControlPanel } = require('../../../utils/panelUpdater');
 
 // Allowed search-prefix values to prevent injection of arbitrary Lavalink prefixes
 const ALLOWED_SOURCES = new Set(['ytmsearch', 'ytsearch', 'scsearch', 'spsearch', 'jssearch', 'amsearch', 'dzsearch']);
@@ -180,6 +181,8 @@ module.exports = {
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
+        // Send/update the control panel so users can interact immediately
+        refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
         return;
       }
       await interaction.deleteReply().catch(() => {});
@@ -192,6 +195,8 @@ module.exports = {
         const payload = buildAddedToQueueV2(track, queueSize);
         await interaction.editReply(payload);
         setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
+        // Send/update the control panel so users can interact immediately
+        refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
         return;
       }
       // Starting fresh – delete the deferred reply and let playerStart handle the Now Playing panel

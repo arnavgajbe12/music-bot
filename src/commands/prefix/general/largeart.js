@@ -10,18 +10,18 @@ module.exports = {
 
   async run(client, message, args) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return message.reply({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
     }
 
     const arg = (args[0] || '').toLowerCase();
     if (!['on', 'off'].includes(arg)) {
-      return message.reply({ embeds: [buildErrorEmbed('Usage: `!largeart on` or `!largeart off`')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Usage: `!largeart on` or `!largeart off`')] });
     }
 
     const newVal = arg === 'on';
     updateSettings(message.guild.id, { largeArt: newVal });
 
-    return message.reply({
+    return message.channel.send({
       embeds: [
         buildEmbed(
           newVal

@@ -15,7 +15,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setColor(config.embeds.errorColor)
         .setDescription('❌ No Lavalink nodes are configured.');
-      return message.reply({ embeds: [embed] });
+      return message.channel.send({ embeds: [embed] });
     }
 
     const embed = new EmbedBuilder()
@@ -55,6 +55,6 @@ module.exports = {
       });
     }
 
-    return message.reply({ embeds: [embed] });
+    return message.channel.send({ embeds: [embed] });
   },
 };
