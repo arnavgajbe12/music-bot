@@ -222,25 +222,15 @@ function buildNowPlayingV2(track, player, largeArt = true) {
     `👤  ${requesterName}`;
 
   if (largeArt) {
-    if (isWide) {
-      // Explicit YouTube (!yt / /yt) — render at native 16:9 with MediaGallery
-      container.addMediaGalleryComponents(
-        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-      );
-      // Large song title (## heading) below the image, no link
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`## ${track.title}`),
-      );
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
-    } else {
-      // YTM / Spotify / everything else — ThumbnailBuilder forces a 1:1 square crop
-      const section = new SectionBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`## ${track.title}\n${detailText}`),
-        )
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-      container.addSectionComponents(section);
-    }
+    // Large gallery image for all track types (as required)
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+    // Large song title (## heading) below the image, no link
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${track.title}`),
+    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
   } else {
     // Small thumbnail in a section accessory
     const section = new SectionBuilder()
@@ -467,9 +457,6 @@ function buildSetupControlsDropdownDisabledV2() {
  * Attempt to return a 1:1 square thumbnail URL.
  * For YouTube Music thumbnails hosted on lh3.googleusercontent.com, appends
  * the =w500-h500-l90-rj resize parameter to get a square crop.
- * For YouTube video thumbnails (i.ytimg.com / img.youtube.com), swaps the
- * quality variant to hqdefault (480×360) which Discord's ThumbnailBuilder
- * will centre-crop closer to 1:1.
  * For all other URLs the original URL is returned unchanged.
  * @param {string} url - Original thumbnail URL
  * @returns {string} Possibly-modified URL
@@ -478,18 +465,9 @@ function getSquareThumbnailUrl(url) {
   if (!url) return url;
   try {
     const parsed = new URL(url);
-    // YouTube Music album art — append Google image-serving square crop param
     if (parsed.hostname === 'lh3.googleusercontent.com') {
       // Strip any existing image-serving suffix and force a 500x500 square crop
       return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
-    }
-    // YouTube video thumbnail fallback — swap to hqdefault (480×360)
-    // Discord's ThumbnailBuilder will centre-crop it closer to 1:1
-    if (parsed.hostname === 'i.ytimg.com' || parsed.hostname === 'img.youtube.com') {
-      return url.replace(
-        /\/(maxresdefault|mqdefault|sddefault|hqdefault|default)(\.jpg|\.webp)?(\?.*)?$/,
-        '/hqdefault.jpg',
-      );
     }
   } catch {
     // Not a valid URL — return as-is
@@ -568,26 +546,17 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
     durationLine = `-# ${totalDuration}`;
   }
 
-  if (isWide) {
-    // Explicit YouTube (!yt / /yt) — render at native 16:9 with MediaGallery
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${track.title}`),
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`${artist}\n${durationLine}`),
-    );
-  } else {
-    // YTM / Spotify / everything else — ThumbnailBuilder forces a 1:1 square crop
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`## ${track.title}\n${artist}\n${durationLine}`),
-      )
-      .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-    container.addSectionComponents(section);
-  }
+  // Large gallery image for all track types (as required — large image everywhere)
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+  );
+  // Large text title (## heading) below the image
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${track.title}`),
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`${artist}\n${durationLine}`),
+  );
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addActionRowComponents(buildSetupButtonsV2(player));
@@ -702,13 +671,7 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   );
 
   // ── Current track (big format) ─────────────────────────────────────────────
-  // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video frame) for non-yt tracks
-  // getThumbnailDisplayMode returns 'wide' only for tracks searched via !yt / /yt (track.useWide=true)
-  const currentIsWide = getThumbnailDisplayMode(currentTrack) === 'wide';
-  const currentRawArtUrl = currentIsWide
-    ? (currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail)
-    : (currentTrack.artworkUrl || currentTrack.thumbnail || config.images.defaultThumbnail);
-  const currentArtUrl = currentIsWide ? currentRawArtUrl : getSquareThumbnailUrl(currentRawArtUrl);
+  const currentArtUrl = getSquareThumbnailUrl(currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail);
   const currentTotalDur = formatDuration(currentTrack.length);
   let currentDurLine;
   if (player.paused && player.position > 0) {
