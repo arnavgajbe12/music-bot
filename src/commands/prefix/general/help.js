@@ -20,7 +20,7 @@ module.exports = {
     const embed = buildCategoryEmbed(category, displayPrefix);
     const row = buildSelectMenu(category);
 
-    const reply = await message.reply({ embeds: [embed], components: [row] });
+    const reply = await message.channel.send({ embeds: [embed], components: [row] });
 
     // Auto-delete to keep chat clean
     setTimeout(() => reply.delete().catch(() => {}), HELP_AUTO_DELETE_MS);

@@ -9,11 +9,11 @@ module.exports = {
 
   async run(client, message, args) {
     if (!config.botSetup.devs.includes(message.author.id)) {
-      return message.reply({ content: `${config.emojis.error} You do not have permission to use this command.` });
+      return message.channel.send({ content: `${config.emojis.error} You do not have permission to use this command.` });
     }
 
     if (!args.length) {
-      return message.reply({ content: `${config.emojis.error} Please provide code to evaluate.` });
+      return message.channel.send({ content: `${config.emojis.error} Please provide code to evaluate.` });
     }
 
     const code = args.join(' ');
@@ -34,7 +34,7 @@ module.exports = {
         )
         .setTimestamp();
 
-      return message.reply({ embeds: [embed] });
+      return message.channel.send({ embeds: [embed] });
     } catch (error) {
       const embed = new EmbedBuilder()
         .setColor(config.embeds.errorColor)
@@ -45,7 +45,7 @@ module.exports = {
         )
         .setTimestamp();
 
-      return message.reply({ embeds: [embed] });
+      return message.channel.send({ embeds: [embed] });
     }
   },
 };

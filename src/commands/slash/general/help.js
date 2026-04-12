@@ -36,12 +36,7 @@ const CATEGORIES = {
     commands: [
       { name: 'yt', desc: 'Search and play from YouTube', usage: '!yt <query>' },
       { name: 'ytm', desc: 'Search and play from YouTube Music', usage: '!ytm <query>' },
-      { name: 'sp', desc: 'Search and play from Spotify', usage: '!sp <query>' },
       { name: 'ap', desc: 'Search and play from Apple Music', usage: '!ap <query>' },
-      { name: 'sc', desc: 'Search and play from SoundCloud', usage: '!sc <query>' },
-      { name: 'dz', desc: 'Search and play from Deezer', usage: '!dz <query>' },
-      { name: 'az', desc: 'Search and play from Amazon Music', usage: '!az <query>' },
-      { name: 'js', desc: 'Search and play from JioSaavn', usage: '!js <query>' },
     ],
   },
   setup: {
@@ -53,10 +48,10 @@ const CATEGORIES = {
       { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '!setup remove' },
       { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '!largeart <on|off>' },
       { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '!source' },
-      { name: 'prefixset', desc: 'Set (overwrite) the server command prefix', usage: '!prefixset <prefix>' },
-      { name: 'prefixadd', desc: 'Add an additional server prefix', usage: '!prefixadd <prefix>' },
-      { name: 'prefixremove', desc: 'Remove a server prefix', usage: '!prefixremove <prefix>' },
-      { name: 'prefixlist', desc: 'Show all active server prefixes', usage: '!prefixlist' },
+      { name: '/prefix set', desc: 'Set (overwrite) the server command prefix (Admin only)', usage: '/prefix set <prefix>' },
+      { name: '/prefix add', desc: 'Add an additional server prefix (Admin only)', usage: '/prefix add <prefix>' },
+      { name: '/prefix remove', desc: 'Remove a server prefix (Admin only)', usage: '/prefix remove <prefix>' },
+      { name: '/prefix list', desc: 'Show all active server prefixes', usage: '/prefix list' },
     ],
   },
   dj: {

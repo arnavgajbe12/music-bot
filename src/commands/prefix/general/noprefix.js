@@ -40,16 +40,16 @@ module.exports = {
     if (ENABLE_WORDS.includes(subcommand) || DISABLE_WORDS.includes(subcommand)) {
       const entries = noprefixList();
       if (!entries[message.author.id]) {
-        return message.reply({ embeds: [buildErrorEmbed('You do not have no-prefix access to toggle.')] });
+        return message.channel.send({ embeds: [buildErrorEmbed('You do not have no-prefix access to toggle.')] });
       }
       const enable = ENABLE_WORDS.includes(subcommand);
       noprefixSetEnabled(message.author.id, enable);
-      return message.reply({ embeds: [buildEmbed(`✅ No-prefix has been **${enable ? 'enabled' : 'disabled'}** for you.`)] });
+      return message.channel.send({ embeds: [buildEmbed(`✅ No-prefix has been **${enable ? 'enabled' : 'disabled'}** for you.`)] });
     }
 
     // ── Admin / Dev only below this point ────────────────────────────────────
     if (!isDevOrAdmin(message.member)) {
-      return message.reply({ embeds: [buildErrorEmbed('You need Administrator permission or Developer status to manage no-prefix access.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('You need Administrator permission or Developer status to manage no-prefix access.')] });
     }
 
     // ── list ─────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ module.exports = {
       const entries = noprefixList();
       const keys = Object.keys(entries);
       if (keys.length === 0) {
-        return message.reply({ embeds: [buildEmbed('📋 No users have no-prefix access.')] });
+        return message.channel.send({ embeds: [buildEmbed('📋 No users have no-prefix access.')] });
       }
       const lines = keys.map((uid) => {
         const e = entries[uid];
@@ -70,17 +70,17 @@ module.exports = {
         .setTitle('📋 No-Prefix Access List')
         .setDescription(lines.join('\n'))
         .setFooter({ text: config.embeds.footerText });
-      return message.reply({ embeds: [embed] });
+      return message.channel.send({ embeds: [embed] });
     }
 
     // ── remove ───────────────────────────────────────────────────────────────
     if (subcommand === 'remove') {
       const target = message.mentions.users.first();
-      if (!target) return message.reply({ embeds: [buildErrorEmbed('Please mention a user to remove.')] });
+      if (!target) return message.channel.send({ embeds: [buildErrorEmbed('Please mention a user to remove.')] });
       noprefixRemove(target.id);
-      return message.reply({ embeds: [buildEmbed(`✅ Removed no-prefix access from **${target.username}**.`)] });
+      return message.channel.send({ embeds: [buildEmbed(`✅ Removed no-prefix access from **${target.username}**.`)] });
     }
 
-    return message.reply({ embeds: [buildErrorEmbed(`Unknown subcommand. Use: \`enable\`, \`disable\`, \`remove @user\`, or \`list\`.\nTo add: use \`!noprefixadd @user <time|permanent>\``)] });
+    return message.channel.send({ embeds: [buildErrorEmbed(`Unknown subcommand. Use: \`enable\`, \`disable\`, \`remove @user\`, or \`list\`.\nTo add: use \`!noprefixadd @user <time|permanent>\``)] });
   },
 };

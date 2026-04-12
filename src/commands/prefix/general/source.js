@@ -11,7 +11,7 @@ module.exports = {
 
   async run(client, message) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return message.reply({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('You need the **Manage Server** permission to use this command.')] });
     }
 
     const settings = getSettings(message.guild.id);
@@ -20,6 +20,6 @@ module.exports = {
       settings.playbackSource || 'ytmsearch:',
     );
 
-    return message.reply(panel);
+    return message.channel.send(panel);
   },
 };

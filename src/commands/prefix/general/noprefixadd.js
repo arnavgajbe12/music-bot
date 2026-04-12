@@ -34,12 +34,12 @@ module.exports = {
     const isDev = config.botSetup.devs.includes(message.author.id);
     const isAdmin = message.member.permissions.has('Administrator');
     if (!isDev && !isAdmin) {
-      return message.reply({ embeds: [buildErrorEmbed('You need Administrator permission or Developer status to use this command.')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('You need Administrator permission or Developer status to use this command.')] });
     }
 
     const target = message.mentions.users.first();
     if (!target) {
-      return message.reply({ embeds: [buildErrorEmbed('Please mention a user. Usage: `!noprefixadd @user <time|permanent>`')] });
+      return message.channel.send({ embeds: [buildErrorEmbed('Please mention a user. Usage: `!noprefixadd @user <time|permanent>`')] });
     }
 
     const timeArg = args[1] || 'permanent';
@@ -49,7 +49,7 @@ module.exports = {
     noprefixAdd(target.id, expiresAt);
 
     const expStr = expiresAt ? `<t:${Math.floor(expiresAt / 1000)}:R>` : 'permanently';
-    return message.reply({
+    return message.channel.send({
       embeds: [buildEmbed(`✅ Granted no-prefix access to **${target.username}** ${expStr}.`)],
     });
   },

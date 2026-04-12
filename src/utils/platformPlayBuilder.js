@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed } = require('./embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('./componentBuilder');
 const { checkVoice } = require('./functions');
+const { getSettings } = require('./setupManager');
+const { refreshControlPanel } = require('./panelUpdater');
 
 /**
  * Build a platform-specific play command.
@@ -95,6 +97,7 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
       }
 
       const wasIdle = !player.playing && !player.paused;
+      const settings = getSettings(interaction.guild.id);
 
       if (result.type === 'PLAYLIST') {
         for (const track of result.tracks) player.queue.add(track);
@@ -108,6 +111,8 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
           await interaction.editReply(payload);
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
+          // Send/update the control panel so users can interact immediately
+          refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
           return;
         }
         // wasIdle: must editReply before deleteReply (Discord API requirement for deferred replies)
@@ -121,6 +126,8 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           const payload = buildAddedToQueueV2(track, queueSize);
           await interaction.editReply(payload);
           setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
+          // Send/update the control panel so users can interact immediately
+          refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
           return;
         }
         // wasIdle: must editReply before deleteReply
@@ -153,12 +160,12 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
 
     async run(client, message, args) {
       if (!args.length) {
-        return message.reply({ embeds: [buildErrorEmbed(`Please provide a song name to search on ${platformLabel}.`)] });
+        return message.channel.send({ embeds: [buildErrorEmbed(`Please provide a song name to search on ${platformLabel}.`)] });
       }
 
       const voiceCheck = checkVoice(message.member, message.guild);
       if (!voiceCheck.ok) {
-        return message.reply({ embeds: [buildErrorEmbed(voiceCheck.error)] });
+        return message.channel.send({ embeds: [buildErrorEmbed(voiceCheck.error)] });
       }
 
       const rawQuery = args.join(' ');
@@ -234,6 +241,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
       searchMsg.delete().catch(() => {});
 
       const wasIdle = !player.playing && !player.paused;
+      const settings = getSettings(message.guild.id);
 
       if (result.type === 'PLAYLIST') {
         for (const track of result.tracks) player.queue.add(track);
@@ -243,6 +251,8 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
           const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
           setTimeout(() => reply.delete().catch(() => {}), 15000);
           if (!player.playing && !player.paused) await player.play();
+          // Send/update the control panel so users can interact immediately
+          refreshControlPanel(client, message.channel, player, settings).catch(() => {});
           return;
         }
       } else {
@@ -254,6 +264,8 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
           const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
           setTimeout(() => reply.delete().catch(() => {}), 15000);
           if (!player.playing && !player.paused) await player.play();
+          // Send/update the control panel so users can interact immediately
+          refreshControlPanel(client, message.channel, player, settings).catch(() => {});
           return;
         }
       }

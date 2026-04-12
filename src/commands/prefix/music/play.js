@@ -3,6 +3,7 @@ const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/co
 const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
+const { refreshControlPanel } = require('../../../utils/panelUpdater');
 
 module.exports = {
   name: 'play',
@@ -142,6 +143,8 @@ module.exports = {
         const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
         setTimeout(() => reply.delete().catch(() => {}), 15000);
         if (!player.playing && !player.paused) await player.play();
+        // Send/update the control panel so users can interact immediately
+        refreshControlPanel(client, message.channel, player, settings).catch(() => {});
         return;
       }
     } else {
@@ -154,6 +157,8 @@ module.exports = {
         const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
         setTimeout(() => reply.delete().catch(() => {}), 15000);
         if (!player.playing && !player.paused) await player.play();
+        // Send/update the control panel so users can interact immediately
+        refreshControlPanel(client, message.channel, player, settings).catch(() => {});
         return;
       }
     }
