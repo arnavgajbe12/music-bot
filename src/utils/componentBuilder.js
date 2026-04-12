@@ -455,9 +455,11 @@ function buildSetupControlsDropdownDisabledV2() {
 
 /**
  * Attempt to return a 1:1 square thumbnail URL.
- * For YouTube Music thumbnails hosted on lh3.googleusercontent.com, appends
- * the =w500-h500-l90-rj resize parameter to get a square crop.
- * For all other URLs the original URL is returned unchanged.
+ * - For YouTube Music thumbnails (lh3.googleusercontent.com): appends the
+ *   =w500-h500-l90-rj resize parameter so the CDN returns a 500×500 square crop.
+ * - For YouTube video thumbnails (i.ytimg.com / img.youtube.com): swaps to
+ *   hqdefault.jpg (480×360) which Discord's MediaGallery centre-crops closer to 1:1.
+ * - All other URLs are returned unchanged.
  * @param {string} url - Original thumbnail URL
  * @returns {string} Possibly-modified URL
  */
@@ -465,9 +467,18 @@ function getSquareThumbnailUrl(url) {
   if (!url) return url;
   try {
     const parsed = new URL(url);
+
+    // Google image-serving CDN (YTM / Spotify album art via LavaSrc)
     if (parsed.hostname === 'lh3.googleusercontent.com') {
-      // Strip any existing image-serving suffix and force a 500x500 square crop
       return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
+    }
+
+    // YouTube video thumbnails — natively 16:9; swap to hqdefault (480×360)
+    if (parsed.hostname === 'i.ytimg.com' || parsed.hostname === 'img.youtube.com') {
+      return url.replace(
+        /\/(maxresdefault|mqdefault|sddefault|hqdefault|default)(\.jpg|\.webp)?(\?.*)?$/,
+        '/hqdefault.jpg',
+      );
     }
   } catch {
     // Not a valid URL — return as-is
@@ -907,19 +918,13 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
     `👤 **Requested by:** ${requesterName}`;
 
   if (largeArt) {
-    if (isYTM) {
-      // YouTube Music: 1:1 square thumbnail as section accessory
-      const section = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(artUrl));
-      container.addSectionComponents(section);
-    } else {
-      // YouTube/other: 16:9 gallery image
-      container.addMediaGalleryComponents(
-        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
-      );
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
-    }
+    // Always use MediaGalleryBuilder so the image renders large.
+    // For non-wide (YTM/Spotify) tracks the CDN already returns a square crop
+    // via getSquareThumbnailUrl, so the gallery renders large AND square.
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(artUrl)),
+    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText));
   } else {
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(detailText))
