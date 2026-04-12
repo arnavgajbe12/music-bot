@@ -87,6 +87,16 @@ module.exports = {
 
       const payload = buildNowPlayingV2(track, player, settings.largeArt);
       await updateNowPlayingMessage(client, player, payload, channelId);
+
+      // Auto-adopt the NP message as the control message if no dedicated control panel exists yet
+      if (!controlMsgId) {
+        const npId = player.data.get('nowPlayingMessageId');
+        const npChanId = player.data.get('nowPlayingMessageChannelId');
+        if (npId && npChanId) {
+          player.data.set('controlMessageId', npId);
+          player.data.set('controlMessageChannelId', npChanId);
+        }
+      }
     }
 
     // ── Auto-update Voice Channel Status ─────────────────────────────────────

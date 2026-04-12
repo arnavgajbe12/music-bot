@@ -49,12 +49,19 @@ module.exports = {
       });
       player.data.set('textChannel', message.channel.id);
     } else {
+      const prevChannelId = player.data.get('textChannel');
+      const channelChanged = prevChannelId && prevChannelId !== message.channel.id;
       // Always update the text channel to where !play was just used (item 3)
       player.data.set('textChannel', message.channel.id);
       // Clear old now-playing message reference so a new one is sent in this channel
       player.data.delete('nowPlayingMessage');
       player.data.delete('nowPlayingMessageId');
       player.data.delete('nowPlayingMessageChannelId');
+      // Move the control panel to the new channel when user switches channels
+      if (channelChanged) {
+        player.data.delete('controlMessageId');
+        player.data.delete('controlMessageChannelId');
+      }
     }
 
     // Use per-guild playback source if set, otherwise use the ytmsearch → ytsearch → scsearch fallback

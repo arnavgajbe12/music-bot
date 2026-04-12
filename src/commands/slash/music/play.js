@@ -93,12 +93,19 @@ module.exports = {
       });
       player.data.set('textChannel', interaction.channel.id);
     } else {
+      const prevChannelId = player.data.get('textChannel');
+      const channelChanged = prevChannelId && prevChannelId !== interaction.channel.id;
       // Update text channel if the user is issuing the command from a different channel
       player.data.set('textChannel', interaction.channel.id);
       // Clear old now-playing message reference so a new one is sent
       player.data.delete('nowPlayingMessage');
       player.data.delete('nowPlayingMessageId');
       player.data.delete('nowPlayingMessageChannelId');
+      // Move the control panel to the new channel when user switches channels
+      if (channelChanged) {
+        player.data.delete('controlMessageId');
+        player.data.delete('controlMessageChannelId');
+      }
     }
 
     // Use source option (if provided) → per-guild source → fallback chain
