@@ -48,6 +48,11 @@ module.exports = {
     const msg = await message.channel.send(payload);
     player.data.set('controlMessageId', msg.id);
     player.data.set('controlMessageChannelId', message.channel.id);
+    player.data.set('nowPlayingMessage', msg);
+    player.data.set('nowPlayingMessageId', msg.id);
+    player.data.set('nowPlayingMessageChannelId', message.channel.id);
+    player.data.set('npBuryCount', 0);
+    player.data.set('textChannel', message.channel.id);
 
     // Auto-delete the command invocation message to keep things clean
     message.delete().catch(() => {});

@@ -32,8 +32,10 @@ module.exports = {
     const botVoiceChannelId = message.guild.members.me?.voice?.channelId;
     if (player && !botVoiceChannelId) {
       console.log(`[prefix play] Stale player detected in guild "${message.guild.id}" — destroying before rejoin.`);
-      player.data.set('intentionalDisconnect', true);
-      await player.destroy().catch(() => {});
+      try { await player.shoukaku?.node?.destroyPlayer(message.guild.id); } catch {}
+      try { await client.manager.shoukaku?.leaveVoiceChannel(message.guild.id); } catch {}
+      try { await player.destroy(); } catch {}
+      client.manager.players.delete(message.guild.id);
       player = null;
     }
 

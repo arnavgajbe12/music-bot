@@ -52,5 +52,10 @@ module.exports = {
     const msg = await interaction.editReply(payload);
     player.data.set('controlMessageId', msg.id);
     player.data.set('controlMessageChannelId', interaction.channel.id);
+    player.data.set('nowPlayingMessage', msg);
+    player.data.set('nowPlayingMessageId', msg.id);
+    player.data.set('nowPlayingMessageChannelId', interaction.channel.id);
+    player.data.set('npBuryCount', 0);
+    player.data.set('textChannel', interaction.channel.id);
   },
 };
