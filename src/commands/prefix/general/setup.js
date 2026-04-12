@@ -1,7 +1,7 @@
 const { PermissionFlagsBits } = require('discord.js');
 const { buildEmbed, buildErrorEmbed } = require('../../../utils/embeds');
 const { buildSetupIdleV2 } = require('../../../utils/componentBuilder');
-const { saveSetup, removeSetup } = require('../../../utils/setupManager');
+const { saveSetup, removeSetup, getSetup } = require('../../../utils/setupManager');
 
 module.exports = {
   name: 'setup',
@@ -30,6 +30,14 @@ module.exports = {
     if (!channel?.isTextBased()) {
       return message.channel.send({
         embeds: [buildErrorEmbed('Please mention a valid text channel, e.g. `!setup #music`')],
+      });
+    }
+
+    // Block setting a new setup channel if one is already configured
+    const existing = getSetup(message.guild.id);
+    if (existing) {
+      return message.channel.send({
+        embeds: [buildErrorEmbed(`A Song Request channel is already configured (<#${existing.channelId}>). Please run \`!setup remove\` first.`)],
       });
     }
 

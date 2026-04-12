@@ -110,7 +110,6 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
             : (firstTrack?.artworkUrl || firstTrack?.thumbnail);
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
           await interaction.editReply(payload);
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           // Send/update the control panel so users can interact immediately
           refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
           return;
@@ -125,7 +124,6 @@ function buildPlatformPlayCommand(name, description, searchPrefix, platformLabel
           const queueSize = player.queue.size ?? player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
           await interaction.editReply(payload);
-          setTimeout(() => interaction.deleteReply().catch(() => {}), 15000);
           // Send/update the control panel so users can interact immediately
           refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
           return;
@@ -249,7 +247,6 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
           const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
           const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
           const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
-          setTimeout(() => reply.delete().catch(() => {}), 15000);
           if (!player.playing && !player.paused) await player.play();
           // Send/update the control panel so users can interact immediately
           refreshControlPanel(client, message.channel, player, settings).catch(() => {});
@@ -261,8 +258,7 @@ function buildPlatformPrefixCommand(name, aliases, description, searchPrefix, pl
         if (!wasIdle) {
           const queueSize = player.queue.length;
           const payload = buildAddedToQueueV2(track, queueSize);
-          const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
-          setTimeout(() => reply.delete().catch(() => {}), 15000);
+          await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
           if (!player.playing && !player.paused) await player.play();
           // Send/update the control panel so users can interact immediately
           refreshControlPanel(client, message.channel, player, settings).catch(() => {});

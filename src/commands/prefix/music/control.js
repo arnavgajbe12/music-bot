@@ -9,7 +9,7 @@ const { getSettings } = require('../../../utils/setupManager');
 
 module.exports = {
   name: 'control',
-  aliases: ['ctrl'],
+  aliases: ['ctrl', 'c'],
   description: 'Send a portable music control panel that stays updated.',
   usage: '',
 
