@@ -5,6 +5,7 @@ const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
 const { refreshControlPanel } = require('../../../utils/panelUpdater');
+const { METADATA_SOURCE_TO_PREFIX } = require('../../../utils/constants');
 
 // Allowed search-prefix values to prevent injection of arbitrary Lavalink prefixes
 const ALLOWED_SOURCES = new Set(['ytmsearch', 'ytsearch', 'scsearch', 'spsearch', 'jssearch', 'amsearch', 'dzsearch']);
@@ -42,7 +43,9 @@ module.exports = {
       return interaction.respond([]).catch(() => {});
     }
     try {
-      const query = `ytmsearch:${focusedValue.trim()}`;
+      const settings = getSettings(interaction.guild.id);
+      const searchPrefix = METADATA_SOURCE_TO_PREFIX[settings.metadataSource] || 'ytmsearch:';
+      const query = `${searchPrefix}${focusedValue.trim()}`;
       const result = await client.manager.search(query, { requester: interaction.user, source: '' });
       if (!result || !result.tracks.length) return interaction.respond([]).catch(() => {});
       const choices = result.tracks.slice(0, 10).map((t) => {
@@ -109,12 +112,15 @@ module.exports = {
       }
     }
 
-    // Use source option (if provided) → per-guild source → fallback chain
+    // Use source option (if provided) → per-guild metadataSource → playbackSource → fallback chain
     const settings = getSettings(interaction.guild.id);
     const sourceOption = interaction.options.getString('source');
     // Build the search prefix: colon is appended to the option value (e.g. 'ytmsearch' → 'ytmsearch:')
     const selectedPrefix = sourceOption && ALLOWED_SOURCES.has(sourceOption) ? `${sourceOption}:` : null;
-    const effectivePrefix = selectedPrefix || settings.playbackSource || null;
+    const effectivePrefix = selectedPrefix
+      || METADATA_SOURCE_TO_PREFIX[settings.metadataSource]
+      || settings.playbackSource
+      || null;
 
     let result;
     try {
@@ -180,7 +186,6 @@ module.exports = {
         const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         await interaction.editReply(payload);
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
         // Send/update the control panel so users can interact immediately
         refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
         return;
@@ -194,7 +199,6 @@ module.exports = {
         const queueSize = player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         await interaction.editReply(payload);
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 20000);
         // Send/update the control panel so users can interact immediately
         refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
         return;

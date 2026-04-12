@@ -40,18 +40,12 @@ module.exports = {
       });
     }
 
-    // If a setup channel is already configured, try to delete the old panel message
+    // Block setting a new setup channel if one is already configured
     const existingSetup = getSetup(interaction.guild.id);
     if (existingSetup) {
-      try {
-        const oldChannel = client.channels.cache.get(existingSetup.channelId);
-        if (oldChannel?.isTextBased()) {
-          const oldMsg = await oldChannel.messages.fetch(existingSetup.messageId).catch(() => null);
-          if (oldMsg) await oldMsg.delete().catch(() => {});
-        }
-      } catch {
-        // Non-fatal — old panel may already be gone
-      }
+      return interaction.editReply({
+        embeds: [buildErrorEmbed(`A Song Request channel is already configured (<#${existingSetup.channelId}>). Please run \`/setup remove\` first.`)],
+      });
     }
 
     const payload = buildSetupIdleV2();

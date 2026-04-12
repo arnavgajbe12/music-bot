@@ -73,10 +73,20 @@ module.exports = {
           if (controlMsg?.editable) {
             const payload = buildNowPlayingV2(track, player, settings.largeArt);
             await controlMsg.edit(payload).catch(() => {});
+          } else {
+            // Message gone or not editable — clear stale reference so auto-adopt can fire below
+            player.data.delete('controlMessageId');
+            player.data.delete('controlMessageChannelId');
           }
+        } else {
+          // Channel gone — clear stale reference
+          player.data.delete('controlMessageId');
+          player.data.delete('controlMessageChannelId');
         }
       } catch {
-        // Non-fatal
+        // Non-fatal — clear stale reference so we can re-adopt
+        player.data.delete('controlMessageId');
+        player.data.delete('controlMessageChannelId');
       }
     }
 
@@ -89,7 +99,8 @@ module.exports = {
       await updateNowPlayingMessage(client, player, payload, channelId);
 
       // Auto-adopt the NP message as the control message if no dedicated control panel exists yet
-      if (!controlMsgId) {
+      // (also fires when controlMessageId was cleared above due to stale reference)
+      if (!player.data.get('controlMessageId')) {
         const npId = player.data.get('nowPlayingMessageId');
         const npChanId = player.data.get('nowPlayingMessageChannelId');
         if (npId && npChanId) {

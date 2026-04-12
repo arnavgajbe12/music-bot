@@ -4,6 +4,7 @@ const { checkVoice, searchWithFallback } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
 const { refreshControlPanel } = require('../../../utils/panelUpdater');
+const { METADATA_SOURCE_TO_PREFIX } = require('../../../utils/constants');
 
 module.exports = {
   name: 'play',
@@ -65,14 +66,15 @@ module.exports = {
       }
     }
 
-    // Use per-guild playback source if set, otherwise use the ytmsearch → ytsearch → scsearch fallback
+    // Use per-guild metadata source if set, otherwise fall back to playbackSource or the search fallback chain
     const settings = getSettings(message.guild.id);
+    const searchPrefix = METADATA_SOURCE_TO_PREFIX[settings.metadataSource] || settings.playbackSource || null;
     let result;
     try {
-      if (settings.playbackSource) {
+      if (searchPrefix) {
         const isUrl = /^https?:\/\//i.test(rawQuery);
-        const query = isUrl ? rawQuery : `${settings.playbackSource}${rawQuery}`;
-        console.log(`[prefix play] Searching with guild source "${settings.playbackSource}" → query: "${query}"`);
+        const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
+        console.log(`[prefix play] Searching with source "${searchPrefix}" → query: "${query}"`);
         // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
         result = await client.manager.search(query, { requester: message.author, source: '' });
         console.log(`[prefix play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
@@ -94,7 +96,7 @@ module.exports = {
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
           { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Search Source', value: searchPrefix || '(none — using fallback)' },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
         ],
       }).catch(() => {});
@@ -116,7 +118,7 @@ module.exports = {
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
           { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Playback Source', value: settings.playbackSource || '(none — using fallback)' },
+          { name: 'Search Source', value: searchPrefix || '(none — using fallback)' },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
           { name: 'Track Count', value: String(result?.tracks?.length ?? 0) },
         ],
@@ -141,7 +143,6 @@ module.exports = {
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         // Item 6: no user ping
         const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
-        setTimeout(() => reply.delete().catch(() => {}), 15000);
         if (!player.playing && !player.paused) await player.play();
         // Send/update the control panel so users can interact immediately
         refreshControlPanel(client, message.channel, player, settings).catch(() => {});
@@ -154,8 +155,7 @@ module.exports = {
         const queueSize = player.queue.length;
         const payload = buildAddedToQueueV2(track, queueSize);
         // Item 6: no user ping
-        const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
-        setTimeout(() => reply.delete().catch(() => {}), 15000);
+        await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
         if (!player.playing && !player.paused) await player.play();
         // Send/update the control panel so users can interact immediately
         refreshControlPanel(client, message.channel, player, settings).catch(() => {});
