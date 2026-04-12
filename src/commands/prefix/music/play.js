@@ -127,9 +127,7 @@ module.exports = {
         player.queue.add(track);
       }
       if (!wasIdle) {
-        const artUrl = result.tracks[0]?.useWide
-          ? (result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl)
-          : (result.tracks[0]?.artworkUrl || result.tracks[0]?.thumbnail);
+        const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         // Item 6: no user ping
         const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
