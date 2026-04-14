@@ -201,7 +201,7 @@ function buildNowPlayingV2(track, player, largeArt = true) {
   // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video) for non-yt tracks
   const rawArtUrl = isWide
     ? (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail)
-    : (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail);
+    : (track.artworkUrl || config.images.defaultThumbnail); // never use 16:9 thumbnail for square art
   const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const isPaused = player.paused;
@@ -467,8 +467,9 @@ function buildSetupControlsDropdownDisabledV2() {
  * Attempt to return a 1:1 square thumbnail URL.
  * - For YouTube Music thumbnails (lh3.googleusercontent.com): appends the
  *   =w500-h500-l90-rj resize parameter so the CDN returns a 500×500 square crop.
- * - For YouTube video thumbnails (i.ytimg.com / img.youtube.com): swaps to
- *   hqdefault.jpg (480×360) which Discord's MediaGallery centre-crops closer to 1:1.
+ * - For YouTube video thumbnails (i.ytimg.com / img.youtube.com): these are
+ *   natively 16:9 and cannot be made square via URL manipulation. Callers should
+ *   prefer artworkUrl for square layouts; if a ytimg URL is passed, it is returned unchanged.
  * - All other URLs are returned unchanged.
  * @param {string} url - Original thumbnail URL
  * @returns {string} Possibly-modified URL
@@ -483,12 +484,12 @@ function getSquareThumbnailUrl(url) {
       return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
     }
 
-    // YouTube video thumbnails — natively 16:9; swap to hqdefault (480×360)
+    // YouTube video thumbnails (i.ytimg.com) are natively 16:9 and cannot be made
+    // square via URL manipulation. Callers should prefer artworkUrl
+    // (lh3.googleusercontent.com album art) for square layouts.
+    // Return as-is; if a ytimg URL reaches here, it will display as-is.
     if (parsed.hostname === 'i.ytimg.com' || parsed.hostname === 'img.youtube.com') {
-      return url.replace(
-        /\/(maxresdefault|mqdefault|sddefault|hqdefault|default)(\.jpg|\.webp)?(\?.*)?$/,
-        '/hqdefault.jpg',
-      );
+      return url;
     }
   } catch {
     // Not a valid URL — return as-is
@@ -521,7 +522,7 @@ function buildSetupNowPlayingV2(track, player, accentColor) {
   // For wide (yt) tracks prefer thumbnail (16:9); for all others prefer artworkUrl (1:1)
   const rawArtUrl = isWide
     ? (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail)
-    : (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail);
+    : (track.artworkUrl || config.images.defaultThumbnail); // never use 16:9 thumbnail for square art
   const artUrl = isWide ? rawArtUrl : getSquareThumbnailUrl(rawArtUrl);
 
   const container = new ContainerBuilder();
@@ -692,7 +693,8 @@ function buildSetupQueueViewV2(currentTrack, tracks, page = 1, accentColor, play
   );
 
   // ── Current track (big format) ─────────────────────────────────────────────
-  const currentArtUrl = getSquareThumbnailUrl(currentTrack.thumbnail || currentTrack.artworkUrl || config.images.defaultThumbnail);
+  // Always prefer artworkUrl (1:1 album art) — never use thumbnail (16:9 video thumb)
+  const currentArtUrl = getSquareThumbnailUrl(currentTrack.artworkUrl || config.images.defaultThumbnail);
   const currentTotalDur = formatDuration(currentTrack.length);
   let currentDurLine;
   if (player.paused && player.position > 0) {
@@ -896,7 +898,7 @@ function buildNowPlayingV2NoButtons(track, player, largeArt = true) {
   const isSquare = getThumbnailDisplayMode(track) === 'square';
   // Prefer artworkUrl (1:1 album art) over thumbnail (16:9 video) for non-yt tracks
   const rawArtUrl = isSquare
-    ? (track.artworkUrl || track.thumbnail || config.images.defaultThumbnail)
+    ? (track.artworkUrl || config.images.defaultThumbnail) // never use 16:9 thumbnail for square
     : (track.thumbnail || track.artworkUrl || config.images.defaultThumbnail);
   const artUrl = isSquare ? getSquareThumbnailUrl(rawArtUrl) : rawArtUrl;
 
