@@ -1,14 +1,11 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { buildErrorEmbed, formatDuration } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
-const { checkVoice, searchWithFallback } = require('../../../utils/functions');
+const { checkVoice } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
 const { refreshControlPanel } = require('../../../utils/panelUpdater');
 const { METADATA_SOURCE_TO_PREFIX } = require('../../../utils/constants');
-
-// Allowed search-prefix values to prevent injection of arbitrary Lavalink prefixes
-const ALLOWED_SOURCES = new Set(['ytmsearch', 'ytsearch', 'scsearch', 'spsearch', 'jssearch', 'amsearch', 'dzsearch']);
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -20,21 +17,6 @@ module.exports = {
         .setDescription('Song name, URL, or Spotify link')
         .setRequired(true)
         .setAutocomplete(true),
-    )
-    .addStringOption((option) =>
-      option
-        .setName('source')
-        .setDescription('Platform to search on (optional)')
-        .setRequired(false)
-        .addChoices(
-          { name: '🔴 YouTube Music (default)', value: 'ytmsearch' },
-          { name: '▶️ YouTube', value: 'ytsearch' },
-          { name: '🟢 Spotify', value: 'spsearch' },
-          { name: '🎵 JioSaavn', value: 'jssearch' },
-          { name: '🍎 Apple Music', value: 'amsearch' },
-          { name: '🎶 Deezer', value: 'dzsearch' },
-          { name: '🔶 SoundCloud', value: 'scsearch' },
-        ),
     ),
 
   async autocomplete(client, interaction) {
@@ -112,32 +94,17 @@ module.exports = {
       }
     }
 
-    // Use source option (if provided) → per-guild metadataSource → playbackSource → fallback chain
+    // Always use per-guild metadataSource for /play metadata fetching
     const settings = getSettings(interaction.guild.id);
-    const sourceOption = interaction.options.getString('source');
-    // Build the search prefix: colon is appended to the option value (e.g. 'ytmsearch' → 'ytmsearch:')
-    const selectedPrefix = sourceOption && ALLOWED_SOURCES.has(sourceOption) ? `${sourceOption}:` : null;
-    const effectivePrefix = selectedPrefix
-      || METADATA_SOURCE_TO_PREFIX[settings.metadataSource]
-      || settings.playbackSource
-      || null;
+    const effectivePrefix = METADATA_SOURCE_TO_PREFIX[settings.metadataSource] || 'ytmsearch:';
 
     let result;
     try {
       const isUrl = /^https?:\/\//i.test(rawQuery);
-      if (effectivePrefix && !isUrl) {
-        const query = `${effectivePrefix}${rawQuery}`;
-        console.log(`[slash play] Searching with prefix "${effectivePrefix}" → query: "${query}"`);
-        result = await client.manager.search(query, { requester: interaction.user, source: '' });
-        console.log(`[slash play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
-        if (!result || !result.tracks.length) {
-          console.log(`[slash play] Primary source returned no tracks, trying fallback chain...`);
-          result = await searchWithFallback(client.manager, rawQuery, interaction.user);
-        }
-      } else {
-        console.log(`[slash play] No source specified, using fallback chain for: "${rawQuery}"`);
-        result = await searchWithFallback(client.manager, rawQuery, interaction.user);
-      }
+      const query = isUrl ? rawQuery : `${effectivePrefix}${rawQuery}`;
+      console.log(`[slash play] Searching with prefix "${effectivePrefix}" → query: "${query}"`);
+      result = await client.manager.search(query, { requester: interaction.user, source: '' });
+      console.log(`[slash play] Search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
     } catch (err) {
       console.error('[slash play] Search threw an exception:', err);
       logToWebhook({
@@ -147,16 +114,11 @@ module.exports = {
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
           { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Effective Source', value: effectivePrefix || '(none — using fallback)' },
+          { name: 'Effective Source', value: effectivePrefix },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
         ],
       }).catch(() => {});
-      try {
-        result = await searchWithFallback(client.manager, rawQuery, interaction.user);
-      } catch (err2) {
-        console.error('[slash play] Fallback search also threw:', err2);
-        return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
-      }
+      return interaction.editReply({ embeds: [buildErrorEmbed('Failed to search for that track.')] });
     }
 
     if (!result || !result.tracks.length) {
@@ -168,7 +130,7 @@ module.exports = {
           { name: 'Guild', value: `${interaction.guild.name} (${interaction.guild.id})`, inline: true },
           { name: 'User', value: `${interaction.user.username} (${interaction.user.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Effective Source', value: effectivePrefix || '(none — using fallback)' },
+          { name: 'Effective Source', value: effectivePrefix },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
           { name: 'Track Count', value: String(result?.tracks?.length ?? 0) },
         ],
@@ -203,10 +165,13 @@ module.exports = {
         refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
         return;
       }
-      // Starting fresh – delete the deferred reply and let playerStart handle the Now Playing panel
+      // Starting fresh – delete the deferred reply and move to the dynamic control panel
       await interaction.deleteReply().catch(() => {});
     }
 
-    if (wasIdle) await player.play();
+    if (wasIdle) {
+      await player.play();
+      refreshControlPanel(client, interaction.channel, player, settings).catch(() => {});
+    }
   },
 };
