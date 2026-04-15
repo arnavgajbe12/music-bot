@@ -1,6 +1,6 @@
 const { buildErrorEmbed } = require('../../../utils/embeds');
 const { buildAddedToQueueV2, buildAddedPlaylistV2 } = require('../../../utils/componentBuilder');
-const { checkVoice, searchWithFallback } = require('../../../utils/functions');
+const { checkVoice } = require('../../../utils/functions');
 const { getSettings } = require('../../../utils/setupManager');
 const { logToWebhook } = require('../../../utils/webhookLogger');
 const { refreshControlPanel } = require('../../../utils/panelUpdater');
@@ -66,27 +66,17 @@ module.exports = {
       }
     }
 
-    // Use per-guild metadata source if set, otherwise fall back to playbackSource or the search fallback chain
+    // Always use the guild metadata source for !play metadata lookups
     const settings = getSettings(message.guild.id);
-    const searchPrefix = METADATA_SOURCE_TO_PREFIX[settings.metadataSource] || settings.playbackSource || null;
+    const searchPrefix = METADATA_SOURCE_TO_PREFIX[settings.metadataSource] || 'ytmsearch:';
     let result;
     try {
-      if (searchPrefix) {
-        const isUrl = /^https?:\/\//i.test(rawQuery);
-        const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
-        console.log(`[prefix play] Searching with source "${searchPrefix}" → query: "${query}"`);
-        // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
-        result = await client.manager.search(query, { requester: message.author, source: '' });
-        console.log(`[prefix play] Primary search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
-        // If no tracks found with configured source, fall back to the default chain
-        if (!result || !result.tracks.length) {
-          console.log(`[prefix play] Primary source returned no tracks, trying fallback chain...`);
-          result = await searchWithFallback(client.manager, rawQuery, message.author);
-        }
-      } else {
-        console.log(`[prefix play] No guild source configured, using fallback chain for: "${rawQuery}"`);
-        result = await searchWithFallback(client.manager, rawQuery, message.author);
-      }
+      const isUrl = /^https?:\/\//i.test(rawQuery);
+      const query = isUrl ? rawQuery : `${searchPrefix}${rawQuery}`;
+      console.log(`[prefix play] Searching with source "${searchPrefix}" → query: "${query}"`);
+      // Pass source: '' so Kazagumo does not add its own prefix on top of the one we already set
+      result = await client.manager.search(query, { requester: message.author, source: '' });
+      console.log(`[prefix play] Search result: type=${result?.type}, tracks=${result?.tracks?.length ?? 0}`);
     } catch (err) {
       console.error('[prefix play] Search threw an exception:', err);
       logToWebhook({
@@ -96,17 +86,12 @@ module.exports = {
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
           { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Search Source', value: searchPrefix || '(none — using fallback)' },
+          { name: 'Search Source', value: searchPrefix },
           { name: 'Error', value: (err?.stack || String(err)).slice(0, 1000) },
         ],
       }).catch(() => {});
-      try {
-        result = await searchWithFallback(client.manager, rawQuery, message.author);
-      } catch (err2) {
-        console.error('[prefix play] Fallback search also threw:', err2);
-        await searchMsg.edit({ content: `❌ Failed to search for that track.` }).catch(() => {});
-        return;
-      }
+      await searchMsg.edit({ content: `❌ Failed to search for that track.` }).catch(() => {});
+      return;
     }
 
     if (!result || !result.tracks.length) {
@@ -118,7 +103,7 @@ module.exports = {
           { name: 'Guild', value: `${message.guild.name} (${message.guild.id})`, inline: true },
           { name: 'User', value: `${message.author.username} (${message.author.id})`, inline: true },
           { name: 'Query', value: rawQuery },
-          { name: 'Search Source', value: searchPrefix || '(none — using fallback)' },
+          { name: 'Search Source', value: searchPrefix },
           { name: 'Result Type', value: result?.type || 'null/undefined' },
           { name: 'Track Count', value: String(result?.tracks?.length ?? 0) },
         ],
@@ -142,7 +127,7 @@ module.exports = {
         const artUrl = result.tracks[0]?.thumbnail || result.tracks[0]?.artworkUrl;
         const payload = buildAddedPlaylistV2(result.playlistName, result.tracks.length, artUrl);
         // Item 6: no user ping
-        const reply = await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
+        await message.channel.send({ ...payload, allowedMentions: { repliedUser: false } });
         if (!player.playing && !player.paused) await player.play();
         // Send/update the control panel so users can interact immediately
         refreshControlPanel(client, message.channel, player, settings).catch(() => {});
@@ -163,6 +148,9 @@ module.exports = {
       }
     }
 
-    if (wasIdle) await player.play();
+    if (wasIdle) {
+      await player.play();
+      refreshControlPanel(client, message.channel, player, settings).catch(() => {});
+    }
   },
 };

@@ -48,10 +48,7 @@ const CATEGORIES = {
       { name: 'setup remove', desc: 'Remove the song request channel setup', usage: '!setup remove' },
       { name: 'largeart', desc: 'Toggle large banner art vs small thumbnail art', usage: '!largeart <on|off>' },
       { name: 'source', desc: 'Set the default metadata and playback source platforms', usage: '!source' },
-      { name: '/prefix set', desc: '(Slash only) Set (overwrite) the server command prefix — Admin only', usage: '/prefix set <prefix>' },
-      { name: '/prefix add', desc: '(Slash only) Add an additional server prefix — Admin only', usage: '/prefix add <prefix>' },
-      { name: '/prefix remove', desc: '(Slash only) Remove a server prefix — Admin only', usage: '/prefix remove <prefix>' },
-      { name: '/prefix list', desc: '(Slash only) Show all active server prefixes', usage: '/prefix list' },
+      { name: '/prefix', desc: '(Slash only) Change the server command prefix — Admin only', usage: '/prefix <new_prefix>' },
     ],
   },
   dj: {

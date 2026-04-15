@@ -15,10 +15,7 @@ const DEV_COMMANDS = [
   { name: 'noprefixadd', usage: '!noprefixadd @user <time|permanent>', desc: 'Grant a user no-prefix access.' },
   { name: 'noprefix remove', usage: '!noprefix remove @user', desc: 'Revoke no-prefix access from a user.' },
   { name: 'noprefix list', usage: '!noprefix list', desc: 'List all no-prefix users.' },
-  { name: '/prefix set', usage: '/prefix set <prefix>', desc: 'Overwrite the guild prefix (slash command).' },
-  { name: '/prefix add', usage: '/prefix add <prefix>', desc: 'Add an additional guild prefix (slash command).' },
-  { name: '/prefix remove', usage: '/prefix remove <prefix>', desc: 'Remove a guild prefix (slash command).' },
-  { name: '/prefix list', usage: '/prefix list', desc: 'List all active guild prefixes (slash command).' },
+  { name: '/prefix', usage: '/prefix <new_prefix>', desc: 'Change the guild prefix (slash command).' },
 ];
 
 module.exports = {
