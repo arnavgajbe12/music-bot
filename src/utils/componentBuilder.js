@@ -170,7 +170,8 @@ function buildMoreOptionsDropdown() {
  */
 function getThumbnailDisplayMode(track) {
   if (track?.useWide === true) return 'wide';
-  if (track?.sourceName === 'youtubemusic') return 'square'; // Always square for YTM
+  // YouTube Music always uses square album art — never force wide
+  if (track?.sourceName === 'youtubemusic') return 'square';
   return 'square';
 }
 
@@ -458,8 +459,8 @@ function buildSetupControlsDropdownDisabledV2() {
  * Attempt to return a 1:1 square thumbnail URL.
  * - For YouTube Music thumbnails (lh3.googleusercontent.com): appends the
  *   =w500-h500-l90-rj resize parameter so the CDN returns a 500×500 square crop.
- * - For YouTube video thumbnails (i.ytimg.com / img.youtube.com): swaps to
- *   hqdefault.jpg (480×360) which Discord's MediaGallery centre-crops closer to 1:1.
+ * - For YouTube video thumbnails (i.ytimg.com / img.youtube.com): normalizes to
+ *   hqdefault.jpg then routes through wsrv.nl to force a 500×500 center crop.
  * - All other URLs are returned unchanged.
  * @param {string} url - Original thumbnail URL
  * @returns {string} Possibly-modified URL
@@ -469,17 +470,20 @@ function getSquareThumbnailUrl(url) {
   try {
     const parsed = new URL(url);
 
-    // Google image-serving CDN (YTM / Spotify album art via LavaSrc)
+    // Google image-serving CDN (YTM / Spotify) — true 500×500 square
     if (parsed.hostname === 'lh3.googleusercontent.com') {
       return url.replace(/=[^&?]*$/, '') + '=w500-h500-l90-rj';
     }
 
-    // YouTube video thumbnails — natively 16:9; swap to hqdefault (480×360)
+    // YouTube video thumbnails — proxy-crop to 500×500 square
     if (parsed.hostname === 'i.ytimg.com' || parsed.hostname === 'img.youtube.com') {
-      return url.replace(
+      // First normalize to hqdefault to avoid 404s on maxresdefault
+      const normalized = url.replace(
         /\/(maxresdefault|mqdefault|sddefault|hqdefault|default)(\.jpg|\.webp)?(\?.*)?$/,
         '/hqdefault.jpg',
       );
+      // Use wsrv.nl free image proxy to force a 500×500 square crop
+      return `https://wsrv.nl/?url=${encodeURIComponent(normalized)}&w=500&h=500&fit=cover&output=jpg`;
     }
   } catch {
     // Not a valid URL — return as-is
